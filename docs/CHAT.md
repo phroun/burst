@@ -797,3 +797,115 @@ you prefer to focus on creating more complex example programs to test the
 current implementation?
 
 ---
+
+**Human:**
+
+Lets move forward and implement the command interpreter and REPL now, unless
+you think there's something more critical to do first?
+
+**Claude:**
+
+You're right - the command interpreter and REPL are the perfect next step!
+This will make the VM much more interactive and educational. Let me implement
+a comprehensive REPL system that includes a debugger and command interpreter.
+
+(Artifact.)
+
+Now let me create an example assembly file and a demonstration script to show
+how to use the REPL:
+
+(Artifact.)
+
+Now let me create a demo script that shows how to use the REPL:
+
+(Artifact.)
+
+Let me also create a comprehensive usage guide:
+
+(Artifact.)
+
+I've now implemented a comprehensive REPL and command interpreter for BURST!
+Here's what I've created:
+
+### 1. BURST REPL (burst-repl.js)
+
+A full-featured interactive environment with:
+
+- Command interpreter with help system
+- Built-in assembler that can assemble files or direct input
+- Debugger with breakpoints, watchpoints, and single-stepping
+- Memory and register inspection
+- Program loading and saving
+- Tab completion for commands
+- Command history
+
+### 2. Example Programs (burst-examples)
+
+Several assembly programs demonstrating:
+
+- Hello World
+- Fibonacci sequence
+- Memory allocation
+- Stack operations and function calls
+
+### 3. Demo Script (burst-demo.js)
+
+An interactive demonstration that:
+
+- Creates example assembly files
+- Shows available features
+- Provides sample commands to try
+
+### 4. User Guide (burst-guide.md)
+
+Comprehensive documentation covering:
+
+- All REPL commands
+- Assembly language syntax
+- Debugging workflow
+- System calls
+- Tips and best practices
+
+## Key Features:
+
+### Interactive Assembly
+
+You can type assembly instructions directly:
+
+  burst> movi r0, #42
+  burst> add r1, r0, r0
+  burst> out r1
+
+### Debugging Support
+
+- Set breakpoints: break 0x100
+- Watch memory changes: watch 0x1000
+- Single-step: step
+- Examine state: info regs, info mem
+
+### File Operations
+
+- Assemble files: assemble program.asm
+- Load binaries: load program.bin
+- Save memory: save memory.bin
+
+### Expression Evaluation
+
+- print r0 - Show register value
+- print [0x1000] - Show memory contents
+- set r0 42 - Modify registers
+
+### The REPL makes BURST much more accessible and educational. Users can now:
+
+- Write and test assembly code interactively
+- Debug programs with breakpoints
+- Learn about VM internals by examining state
+- Build complex programs incrementally
+
+Would you like me to:
+
+Add more advanced debugging features (like conditional breakpoints)?
+Implement a visual debugger interface?
+Create more example programs?
+Move on to implementing file operations and process management?
+
