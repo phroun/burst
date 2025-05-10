@@ -1,0 +1,30 @@
+{
+  "name": "burst-vm-repl",
+  "version": "1.0.0",
+  "description": "BURST Virtual Machine REPL and Command Interpreter",
+  "main": "burst-repl.js",
+  "directories": {
+    "lib": "repl"
+  },
+  "scripts": {
+    "start": "node burst-repl.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "burst",
+    "vm",
+    "repl",
+    "assembler",
+    "debugger"
+  ],
+  "author": "",
+  "license": "ISC",
+  "files": [
+    "burst-repl.js",
+    "repl/command-handlers.js",
+    "repl/assembler-utils.js",
+    "repl/debugger.js",
+    "repl/expression-evaluator.js",
+    "repl/disassembler.js"
+  ]
+}

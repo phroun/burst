@@ -23,6 +23,7 @@ start:
     ; Arithmetic operations
     movi r1, #msg_calc
     movi r2, #14
+    movi r0, #30
     syscall
     
     movi r3, #42
@@ -51,7 +52,11 @@ start:
     mov r6, r0          ; Save allocated address
     
     ; Store and load
-    movi r7, #0xDEADBEEF
+    movi r7, #0xDEAD    ; Load upper half
+    shl r7, r7, #16
+    movi r8, #0xBEEF    ; Load lower half
+    or r7, r7, r8       ; Combine
+    
     store r7, r6, #0
     load r8, r6, #0
     
@@ -65,6 +70,7 @@ memory_ok:
     movi r0, #32
     syscall
     movi r1, #75        ; 'K'
+    movi r0, #32
     syscall
     jmp memory_done
     
@@ -73,10 +79,13 @@ memory_fail:
     movi r0, #32
     syscall
     movi r1, #65        ; 'A'
+    movi r0, #32
     syscall
     movi r1, #73        ; 'I'
+    movi r0, #32
     syscall
     movi r1, #76        ; 'L'
+    movi r0, #32
     syscall
     
 memory_done:
@@ -132,13 +141,15 @@ loop:
 print_number:
     push r0
     push r1
+    push r2
     
     mov r1, r5
     movi r2, #48        ; ASCII '0'
-    add r1, r1, r2
+    add r1, r1, r2      ; Add ASCII offset
     movi r0, #32        ; SYS_PUTCHAR
     syscall
     
+    pop r2
     pop r1
     pop r0
     ret
@@ -166,4 +177,4 @@ add_numbers:
     
     push r1             ; Restore return address
     ret
- 
+    

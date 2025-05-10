@@ -8,7 +8,7 @@ const fs = require('fs');
 
 // Create example files
 const examples = {
-    'hello.asm': `
+    'examples/hello.asm': `
 ; Simple hello world program
 main:
     jmp start
@@ -27,7 +27,7 @@ start:
     syscall
     halt
 `,
-    'counter.asm': `
+    'examples/counter.asm': `
 ; Count from 0 to 9
 main:
     movi r0, #0            ; Counter
@@ -54,7 +54,7 @@ loop:
     
     halt
 `,
-    'calc.asm': `
+    'examples/calc.asm': `
 ; Simple calculator demo
 main:
     movi r0, #10           ; First number

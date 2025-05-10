@@ -1482,6 +1482,108 @@ The key changes:
 
 - Now checks for a colon (:) anywhere in the line
 - Processes the label and continues with the rest of the line
-- Works for both the first pass (calculating addresses) and second pass (generating code)
+- Works for both the first pass (calculating addresses) and second pass
+  (generating code)
 
 ---
+
+**Human::**
+
+Can you write systematic instruction tests for burst-vm, divided into
+separate test files for each category of instructions, with enough output
+that we will be able to diagnose and correct any problems?
+
+**Claude:**
+
+I'll create comprehensive systematic tests for the BURST VM, divided by
+instruction categories. Each test will have detailed output to help diagnose
+issues.
+
+(Artifacts.)
+
+I've created a comprehensive test suite for the BURST VM with the following
+components:
+
+Test Files by Category:
+
+1. Arithmetic Tests (test-arithmetic.asm)
+- ADD, SUB, MUL, DIV, MOD
+- INC, DEC, NEG
+- Overflow handling
+
+2. Logical Tests (test-logical.asm)
+- AND, OR, XOR, NOT
+- SHL, SHR (shift operations)
+
+3. Memory Tests (test-memory.asm)
+- LOAD/STORE (word operations)
+- LOADB/STOREB (byte operations)
+- PUSH/POP (stack operations)
+- Stack function calls
+
+4. Control Flow Tests (test-control.asm)
+- JMP, JZ, JNZ
+- JEQ, JNE, JLT, JGT, JLE, JGE
+- CALL/RET
+- CMP (comparison)
+
+5. System Tests (test-system.asm)
+- SYSCALL operations
+- HALT, NOP
+- Memory allocation (ALLOC/FREE)
+- PRINT operations
+
+6. Register Tests (test-registers.asm)
+- MOV, MOVI
+- Register preservation
+- All register operations
+
+## Test Runner Features:
+
+The test runner (burst-test-runner.js) provides:
+
+- Colored output for easy reading
+- Detailed diagnostics for failed tests
+- Register state dumps
+- Memory dumps around failure points
+- Execution time measurements
+- Per-test and overall summaries
+
+### Usage:
+
+Run all tests:
+
+```bash
+make test
+# or
+node burst-test-runner.
+```
+
+Run specific test category:
+
+```bash
+make test-arithmetic
+make test-memory
+# etc.
+```
+
+### Diagnostic Features:
+
+If a test fails, you'll see:
+
+- The exact test that failed
+- Current register values
+- Memory dump around the program counter
+- Flag states
+- Decoded instruction information
+
+This test suite will help identify any issues with instruction
+implementations and ensure the VM works correctly. Each test
+outputs clear PASS/FAIL messages with descriptive test names,
+making it easy to diagnose and fix problems.
+
+---
+
+At this point, I'm skipping a huge section of chat where we just
+wroked back and forth at fixing bugs identified in the tests.
+

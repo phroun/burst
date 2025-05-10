@@ -72,12 +72,12 @@ countdown:
 `;
 
 // Save the demo program
-fs.writeFileSync('demo.asm', demoProgram);
+fs.writeFileSync('examples/demo.asm', demoProgram);
 
-console.log('Created demo.asm');
+console.log('Created examples/demo.asm');
 console.log('Starting BURST REPL...\n');
 console.log('Commands to try:');
-console.log('1. assemble demo.asm -l');
+console.log('1. assemble examples/demo.asm -l');
 console.log('2. run');
 console.log('3. reset');
 console.log('4. step 10');
@@ -92,7 +92,7 @@ const repl = new BurstREPL();
 // Auto-run some commands to show functionality
 setTimeout(() => {
     console.log('\nAuto-running demo commands...\n');
-    repl.handleCommand('assemble demo.asm -l');
+    repl.handleCommand('assemble examples/demo.asm -l');
     
     setTimeout(() => {
         repl.handleCommand('info regs');
@@ -111,6 +111,6 @@ setTimeout(() => {
 
 // Clean up on exit
 process.on('exit', () => {
-    if (fs.existsSync('demo.asm')) fs.unlinkSync('demo.asm');
-    if (fs.existsSync('demo.bin')) fs.unlinkSync('demo.bin');
+    if (fs.existsSync('examples/demo.asm')) fs.unlinkSync('examples/demo.asm');
+    if (fs.existsSync('examples/demo.bin')) fs.unlinkSync('examples/demo.bin');
 });
