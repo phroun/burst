@@ -29,10 +29,26 @@ const { BurstVM, BurstAssembler } = require('./burst-vm.js');
 // Create a new VM instance
 const vm = new BurstVM();
 
-// Load and run a program
+// Create a simple program using the assembler
+function createProgram() {
+    const asm = new BurstAssembler();
+    
+    // Simple program that adds two numbers
+    asm.movi(1, 5);    // R1 = 5
+    asm.movi(2, 7);    // R2 = 7
+    asm.add(3, 1, 2);  // R3 = R1 + R2
+    asm.halt();
+    
+    return asm.getProgram();
+}
+
+// Load and run the program
 const program = createProgram();
 vm.loadProgram(program);
 vm.run();
+
+// Check the result
+console.log('Result in R3:', vm.registers[3]); // Outputs: 12
 ```
 
 ## Development Roadmap
