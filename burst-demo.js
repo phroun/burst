@@ -17,37 +17,39 @@ hello_str:
     .string "Hello, BURST World!"
     
 start:
-    movi r1, 4             ; String address
-    movi r2, 19            ; String length  
-    movi r0, 30            ; SYS_PRINT
+    movi r1, #hello_str    ; String address
+    movi r2, #19           ; String length  
+    movi r0, #30           ; SYS_PRINT
     syscall
     
-    movi r0, 20            ; SYS_EXIT
-    movi r1, 0             ; Exit code
+    movi r0, #20           ; SYS_EXIT
+    movi r1, #0            ; Exit code
     syscall
     halt
 `,
     'counter.asm': `
 ; Count from 0 to 9
 main:
-    movi r0, 0             ; Counter
+    movi r0, #0            ; Counter
     
 loop:
     ; Print digit
     mov r1, r0
-    add r1, r1, 48         ; Convert to ASCII
+    movi r2, #48           ; ASCII '0'
+    add r1, r1, r2         ; Convert to ASCII
     push r0                ; Save counter
     
-    movi r0, 32            ; SYS_PUTCHAR
+    movi r0, #32           ; SYS_PUTCHAR
     syscall
     
     ; Print newline
-    movi r1, 10
+    movi r1, #10
     syscall
     
     pop r0                 ; Restore counter
     inc r0
-    cmp r0, 10
+    movi r3, #10
+    cmp r0, r3
     jlt loop
     
     halt
@@ -55,8 +57,8 @@ loop:
     'calc.asm': `
 ; Simple calculator demo
 main:
-    movi r0, 10            ; First number
-    movi r1, 5             ; Second number
+    movi r0, #10           ; First number
+    movi r1, #5            ; Second number
     
     ; Add
     add r2, r0, r1         ; r2 = 15
@@ -71,11 +73,11 @@ main:
     div r5, r0, r1         ; r5 = 2
     
     ; Store results in memory
-    movi r6, 0x1000        ; Base address
-    store r2, r6, 0        ; Store sum
-    store r3, r6, 4        ; Store difference
-    store r4, r6, 8        ; Store product
-    store r5, r6, 12       ; Store quotient
+    movi r6, #0x1000       ; Base address
+    store r2, r6, #0       ; Store sum
+    store r3, r6, #4       ; Store difference
+    store r4, r6, #8       ; Store product
+    store r5, r6, #12      ; Store quotient
     
     halt
 `

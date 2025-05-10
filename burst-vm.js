@@ -817,32 +817,12 @@ class BurstAssembler {
         this.labels.set(name, this.address);
     }
     
-    // Resolve labels after assembly
-    resolveLabels() {
-        for (const pending of this.pendingLabels) {
-            const labelAddress = this.labels.get(pending.label);
-            if (labelAddress === undefined) {
-                throw new Error(`Undefined label: ${pending.label}`);
-            }
-            
-            // Update the instruction with the resolved address
-            const offset = pending.offset;
-            const instruction = (this.output[offset] |
-                               (this.output[offset + 1] << 8) |
-                               (this.output[offset + 2] << 16) |
-                               (this.output[offset + 3] << 24));
-            
-            const opcode = instruction >> 24;
-            const newInstruction = (opcode << 24) | (labelAddress & 0xFFFFFF);
-            
-            this.output[offset] = newInstruction & 0xFF;
-            this.output[offset + 1] = (newInstruction >> 8) & 0xFF;
-            this.output[offset + 2] = (newInstruction >> 16) & 0xFF;
-            this.output[offset + 3] = (newInstruction >> 24) & 0xFF;
-        }
+    // Assembly methods for each instruction
+    movi(reg, value) {
+        const operands = (reg << 16) | (value & 0xFFFF);
+        this.emit(this.buildInstruction(OPCODES.MOVI, operands));
     }
     
-    // Assembly methods for each instruction
     // Memory operations
     load(dest, addrReg, offset = 0) {
         const operands = (dest << 16) | (addrReg << 12) | (offset & 0xFFF);
@@ -875,11 +855,6 @@ class BurstAssembler {
     }
     
     // Register operations
-    movi(reg, imm) {
-        const operands = (reg << 16) | (imm & 0xFFFF);
-        this.emit(this.buildInstruction(OPCODES.MOVI, operands));
-    }
-    
     mov(dest, src) {
         const operands = (dest << 16) | (src << 12);
         this.emit(this.buildInstruction(OPCODES.MOV, operands));
@@ -964,54 +939,44 @@ class BurstAssembler {
     }
     
     // Control flow
-    jmp(label) {
-        this.pendingLabels.push({ label, offset: this.address });
-        this.emit(this.buildInstruction(OPCODES.JMP, 0));
+    jmp(address) {
+        this.emit(this.buildInstruction(OPCODES.JMP, address & 0xFFFFFF));
     }
     
-    jz(label) {
-        this.pendingLabels.push({ label, offset: this.address });
-        this.emit(this.buildInstruction(OPCODES.JZ, 0));
+    jz(address) {
+        this.emit(this.buildInstruction(OPCODES.JZ, address & 0xFFFFFF));
     }
     
-    jnz(label) {
-        this.pendingLabels.push({ label, offset: this.address });
-        this.emit(this.buildInstruction(OPCODES.JNZ, 0));
+    jnz(address) {
+        this.emit(this.buildInstruction(OPCODES.JNZ, address & 0xFFFFFF));
     }
     
-    jeq(label) {
-        this.pendingLabels.push({ label, offset: this.address });
-        this.emit(this.buildInstruction(OPCODES.JEQ, 0));
+    jeq(address) {
+        this.emit(this.buildInstruction(OPCODES.JEQ, address & 0xFFFFFF));
     }
     
-    jne(label) {
-        this.pendingLabels.push({ label, offset: this.address });
-        this.emit(this.buildInstruction(OPCODES.JNE, 0));
+    jne(address) {
+        this.emit(this.buildInstruction(OPCODES.JNE, address & 0xFFFFFF));
     }
     
-    jlt(label) {
-        this.pendingLabels.push({ label, offset: this.address });
-        this.emit(this.buildInstruction(OPCODES.JLT, 0));
+    jlt(address) {
+        this.emit(this.buildInstruction(OPCODES.JLT, address & 0xFFFFFF));
     }
     
-    jgt(label) {
-        this.pendingLabels.push({ label, offset: this.address });
-        this.emit(this.buildInstruction(OPCODES.JGT, 0));
+    jgt(address) {
+        this.emit(this.buildInstruction(OPCODES.JGT, address & 0xFFFFFF));
     }
     
-    jle(label) {
-        this.pendingLabels.push({ label, offset: this.address });
-        this.emit(this.buildInstruction(OPCODES.JLE, 0));
+    jle(address) {
+        this.emit(this.buildInstruction(OPCODES.JLE, address & 0xFFFFFF));
     }
     
-    jge(label) {
-        this.pendingLabels.push({ label, offset: this.address });
-        this.emit(this.buildInstruction(OPCODES.JGE, 0));
+    jge(address) {
+        this.emit(this.buildInstruction(OPCODES.JGE, address & 0xFFFFFF));
     }
     
-    call(label) {
-        this.pendingLabels.push({ label, offset: this.address });
-        this.emit(this.buildInstruction(OPCODES.CALL, 0));
+    call(address) {
+        this.emit(this.buildInstruction(OPCODES.CALL, address & 0xFFFFFF));
     }
     
     ret() {
@@ -1032,12 +997,14 @@ class BurstAssembler {
     }
     
     // String data
-    string(str) {
+    string(str, addNull = false) {
         for (let i = 0; i < str.length; i++) {
             this.output.push(str.charCodeAt(i));
         }
-        this.output.push(0); // Null terminator
-        this.address += str.length + 1;
+        if (addNull) {
+            this.output.push(0); // Null terminator
+        }
+        this.address += str.length + (addNull ? 1 : 0);
     }
     
     // Raw data
@@ -1050,7 +1017,6 @@ class BurstAssembler {
     
     // Get final program
     getProgram() {
-        this.resolveLabels();
         return new Uint8Array(this.output);
     }
 }

@@ -407,24 +407,172 @@ class BurstREPL {
             // Create a new assembler for this file
             const asm = new BurstAssembler();
             
-            // Parse assembly source
-            for (const line of lines) {
-                const trimmed = line.trim();
+            // Reset the address
+            asm.address = 0;
+            asm.output = [];
+            asm.labels.clear();
+            asm.pendingLabels = [];
+            
+            // First pass: collect all labels
+            let currentAddress = 0;
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                let trimmed = line.trim();
                 if (!trimmed || trimmed.startsWith(';')) continue;
                 
-                // Handle labels
-                if (trimmed.endsWith(':')) {
-                    asm.label(trimmed.slice(0, -1));
-                    continue;
+                // Check for label (could be on same line as instruction/directive)
+                if (trimmed.includes(':')) {
+                    const colonIndex = trimmed.indexOf(':');
+                    const labelName = trimmed.substring(0, colonIndex).trim();
+                    if (labelName) {
+                        asm.labels.set(labelName, currentAddress);
+                    }
+                    // Continue processing the rest of the line after the label
+                    trimmed = trimmed.substring(colonIndex + 1).trim();
+                    if (!trimmed) continue; // Nothing after the label
                 }
                 
-                // Parse instruction
+                // Parse instruction or directive to calculate size
                 const parts = trimmed.split(/\s+/);
-                const mnemonic = parts[0].toLowerCase();
-                const operands = parts.slice(1).join(' ').split(',').map(s => s.trim());
+                const firstWord = parts[0].toLowerCase();
                 
-                // Assemble instruction
-                await this.assembleInstruction(asm, mnemonic, operands);
+                if (firstWord.startsWith('.')) {
+                    // Handle directives
+                    const directive = firstWord;
+                    const args = parts.slice(1).join(' ');
+                    
+                    switch (directive) {
+                        case '.string':
+                        case '.ascii':
+                            const match = args.match(/^"([^"]*)"/);
+                            if (match) {
+                                currentAddress += match[1].length;
+                            }
+                            break;
+                        case '.byte':
+                        case '.db':
+                            const byteArgs = args.split(',').map(s => s.trim());
+                            currentAddress += byteArgs.length;
+                            break;
+                        case '.word':
+                        case '.dw':
+                            const wordArgs = args.split(',').map(s => s.trim());
+                            currentAddress += wordArgs.length * 4;
+                            break;
+                        case '.space':
+                        case '.skip':
+                            currentAddress += parseInt(args);
+                            break;
+                    }
+                } else {
+                    // Regular instruction - all instructions are 4 bytes
+                    currentAddress += 4;
+                }
+            }
+            
+            // Debug: Show collected labels
+            console.log('Labels found:', Object.fromEntries(asm.labels));
+            
+            // Second pass: generate code
+            asm.address = 0;
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                let trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith(';')) continue;
+                
+                // Skip labels (already processed) but check for same-line content
+                if (trimmed.includes(':')) {
+                    const colonIndex = trimmed.indexOf(':');
+                    const afterLabel = trimmed.substring(colonIndex + 1).trim();
+                    if (!afterLabel) {
+                        continue; // Just a label, nothing else
+                    }
+                    trimmed = afterLabel; // Process what comes after the label
+                }
+                
+                // Parse instruction or directive
+                const parts = trimmed.split(/\s+/);
+                const firstWord = parts[0].toLowerCase();
+                
+                // Handle directives
+                if (firstWord.startsWith('.')) {
+                    const directive = firstWord;
+                    const args = parts.slice(1).join(' ');
+                    
+                    switch (directive) {
+                        case '.string':
+                        case '.ascii':
+                            // Parse string literal
+                            const match = args.match(/^"([^"]*)"/);
+                            if (match) {
+                                asm.string(match[1]);
+                            } else {
+                                throw new Error(`Invalid string literal at line ${i + 1}: ${args}`);
+                            }
+                            break;
+                            
+                        case '.byte':
+                        case '.db':
+                            // Parse byte values
+                            const bytes = args.split(',').map(s => {
+                                const val = s.trim();
+                                if (val.startsWith('0x')) {
+                                    return parseInt(val, 16);
+                                } else {
+                                    return parseInt(val);
+                                }
+                            });
+                            asm.data(bytes);
+                            break;
+                            
+                        case '.word':
+                        case '.dw':
+                            // Parse word values
+                            const words = args.split(',').map(s => {
+                                const val = s.trim();
+                                if (val.startsWith('0x')) {
+                                    return parseInt(val, 16);
+                                } else {
+                                    return parseInt(val);
+                                }
+                            });
+                            // Convert words to bytes
+                            const wordBytes = [];
+                            words.forEach(word => {
+                                wordBytes.push(word & 0xFF);
+                                wordBytes.push((word >> 8) & 0xFF);
+                                wordBytes.push((word >> 16) & 0xFF);
+                                wordBytes.push((word >> 24) & 0xFF);
+                            });
+                            asm.data(wordBytes);
+                            break;
+                            
+                        case '.space':
+                        case '.skip':
+                            // Reserve space
+                            const size = parseInt(args);
+                            asm.data(new Array(size).fill(0));
+                            break;
+                            
+                        default:
+                            throw new Error(`Unknown directive: ${directive} at line ${i + 1}`);
+                    }
+                } else {
+                    // Regular instruction
+                    const mnemonic = firstWord;
+                    let instructionLine = parts.join(' ');
+                    // Remove comments
+                    const commentIndex = instructionLine.indexOf(';');
+                    if (commentIndex !== -1) {
+                        instructionLine = instructionLine.substring(0, commentIndex).trim();
+                    }
+                    
+                    // Re-parse without comments
+                    const instructionParts = instructionLine.split(/\s+/);
+                    const operands = instructionParts.slice(1).join(' ').split(',').map(s => s.trim());
+                    
+                    await this.assembleInstruction(asm, mnemonic, operands);
+                }
             }
             
             // Get final program
@@ -481,23 +629,85 @@ class BurstREPL {
     assembleInstruction(asm, mnemonic, operands) {
         // Parse operands
         const parsedOps = operands.map(op => {
+            if (!op) return 0;
+            
+            // Remove whitespace and comments
+            op = op.trim();
+            const commentIndex = op.indexOf(';');
+            if (commentIndex !== -1) {
+                op = op.substring(0, commentIndex).trim();
+            }
+            
             if (op.match(/^r\d+$/i)) {
                 // Register
                 return parseInt(op.substr(1));
             } else if (op.startsWith('#')) {
                 // Immediate value
-                return this.parseValue(op.substr(1));
+                const val = op.substr(1);
+                
+                // Check if it's a label reference
+                if (asm.labels.has(val)) {
+                    return asm.labels.get(val);
+                }
+                
+                // Try to parse as a number
+                if (val.startsWith('0x')) {
+                    return parseInt(val, 16);
+                } else if (val.match(/^-?\d+$/)) {
+                    return parseInt(val);
+                } else {
+                    // Label that should have been resolved
+                    throw new Error(`Undefined label: ${val}`);
+                }
+            } else if (op.match(/^\[.*\]$/)) {
+                // Memory addressing [reg] or [reg+offset]
+                const inner = op.slice(1, -1);
+                const parts = inner.split('+').map(p => p.trim());
+                
+                if (parts.length === 1) {
+                    // [reg]
+                    if (parts[0].match(/^r\d+$/i)) {
+                        return { type: 'mem', reg: parseInt(parts[0].substr(1)), offset: 0 };
+                    }
+                } else if (parts.length === 2) {
+                    // [reg+offset]
+                    if (parts[0].match(/^r\d+$/i)) {
+                        const reg = parseInt(parts[0].substr(1));
+                        const offset = parseInt(parts[1]);
+                        return { type: 'mem', reg, offset };
+                    }
+                }
+                throw new Error(`Invalid memory addressing: ${op}`);
             } else if (op.match(/^\d+$/)) {
                 // Decimal number
                 return parseInt(op);
             } else if (op.match(/^0x[0-9a-f]+$/i)) {
                 // Hex number
                 return parseInt(op, 16);
+            } else if (op.match(/^-\d+$/)) {
+                // Negative decimal
+                return parseInt(op);
             } else {
-                // Label or symbol
-                return op;
+                // Direct label reference (used in jumps)
+                if (asm.labels.has(op)) {
+                    return asm.labels.get(op);
+                } else {
+                    // Label that should have been resolved
+                    throw new Error(`Undefined label: ${op}`);
+                }
             }
         });
+        
+        // Handle memory addressing for load/store
+        const handleMemoryInstruction = (inst, parsedOps) => {
+            if (parsedOps[1] && typeof parsedOps[1] === 'object' && parsedOps[1].type === 'mem') {
+                // Memory addressing with offset
+                inst(parsedOps[0], parsedOps[1].reg, parsedOps[1].offset);
+            } else {
+                // Regular addressing
+                inst(parsedOps[0], parsedOps[1], parsedOps[2] || 0);
+            }
+        };
         
         // Call appropriate assembler method
         switch (mnemonic) {
@@ -534,10 +744,10 @@ class BurstREPL {
             case 'call': asm.call(parsedOps[0]); break;
             case 'ret': asm.ret(); break;
             case 'syscall': asm.syscall(); break;
-            case 'load': asm.load(parsedOps[0], parsedOps[1], parsedOps[2] || 0); break;
-            case 'store': asm.store(parsedOps[0], parsedOps[1], parsedOps[2] || 0); break;
-            case 'loadb': asm.loadb(parsedOps[0], parsedOps[1], parsedOps[2] || 0); break;
-            case 'storeb': asm.storeb(parsedOps[0], parsedOps[1], parsedOps[2] || 0); break;
+            case 'load': handleMemoryInstruction(asm.load.bind(asm), parsedOps); break;
+            case 'store': handleMemoryInstruction(asm.store.bind(asm), parsedOps); break;
+            case 'loadb': handleMemoryInstruction(asm.loadb.bind(asm), parsedOps); break;
+            case 'storeb': handleMemoryInstruction(asm.storeb.bind(asm), parsedOps); break;
             default:
                 throw new Error(`Unknown mnemonic: ${mnemonic}`);
         }

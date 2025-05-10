@@ -123,8 +123,19 @@ nop               ; No operation
 
 ```assembly
 movi r0, #42      ; Immediate value
+movi r0, #label   ; Label address
 mov r0, r1        ; Register to register
 load r0, r1, #4   ; Register + offset
+```
+
+### Directives
+
+```assembly
+label:            ; Define a label
+.string "text"    ; String data
+.byte 0x12, 0x34  ; Byte data
+.word 0x1234      ; Word data (32-bit)
+.space 100        ; Reserve 100 bytes
 ```
 
 ### System Calls
@@ -148,9 +159,18 @@ Available commands:
   ...
 
 burst> movi r0, #65
+Assembled at 0x0
 burst> movi r1, r0
+Assembled at 0x4  
 burst> movi r0, #32
+Assembled at 0x8
 burst> syscall
+Assembled at 0xc
+burst> step 4
+0x00000000: movi r0, #65
+0x00000004: movi r1, r0
+0x00000008: movi r0, #32
+0x0000000c: syscall
 A
 burst> info regs
 === Register Dump ===
@@ -160,11 +180,10 @@ R1: 0x00000041 (65)
 
 burst> break main
 Breakpoint set at 0x0
-burst> run hello.asm
-Breakpoint at 0x0
-burst> step
-0x00000000: jmp 0x4
-burst> continue
+burst> assemble hello.asm -l
+Assembled hello.asm to hello.bin (32 bytes)
+Program loaded
+burst> run
 Hello, BURST World!
 Program halted
 ```
