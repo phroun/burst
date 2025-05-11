@@ -3,7 +3,7 @@
 // BURST VM REPL Demo
 // This script demonstrates the features of the BURST REPL
 
-const BurstREPL = require('./burst-repl.js');
+const BurstREPL = require('./lib/burst-repl.js');
 const fs = require('fs');
 
 // Create example files

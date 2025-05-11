@@ -3,8 +3,8 @@
 // BURST VM Test Script
 // Tests the complete implementation with REPL
 
-const { BurstVM, BurstAssembler, OPCODES, SYSCALLS } = require('./burst-vm.js');
-const BurstREPL = require('./burst-repl.js');
+const { BurstVM, BurstAssembler, OPCODES, SYSCALLS } = require('./lib/burst-vm.js');
+const BurstREPL = require('./lib/burst-repl.js');
 const fs = require('fs');
 
 console.log('BURST VM Test Suite');

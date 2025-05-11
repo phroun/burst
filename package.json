@@ -2,12 +2,12 @@
   "name": "burst-vm-repl",
   "version": "1.0.0",
   "description": "BURST Virtual Machine REPL and Command Interpreter",
-  "main": "burst-repl.js",
+  "main": "lib/burst-repl.js",
   "directories": {
     "lib": "repl"
   },
   "scripts": {
-    "start": "node burst-repl.js",
+    "start": "node lib/burst-repl.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -17,14 +17,6 @@
     "assembler",
     "debugger"
   ],
-  "author": "",
+  "author": "Jeffrey R. Day",
   "license": "ISC",
-  "files": [
-    "burst-repl.js",
-    "repl/command-handlers.js",
-    "repl/assembler-utils.js",
-    "repl/debugger.js",
-    "repl/expression-evaluator.js",
-    "repl/disassembler.js"
-  ]
 }

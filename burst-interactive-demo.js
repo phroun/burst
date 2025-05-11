@@ -3,7 +3,7 @@
 // BURST VM Interactive Demo
 // Run this to see the VM in action
 
-const BurstREPL = require('./burst-repl.js');
+const BurstREPL = require('./lib/burst-repl.js');
 const fs = require('fs');
 
 console.log('=== BURST VM Interactive Demo ===\n');
