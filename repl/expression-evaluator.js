@@ -1,66 +1,75 @@
-// Expression evaluator for BURST REPL
+// Simple arithmetic expression evaluator
+// Supports: + - * / % ( ) and variables via lookup callback
 
-function evaluateExpression(vm, expr, symbols = new Map()) {
-    // Simple expression evaluator
-    // Supports: registers, memory access, constants
-    
-    if (expr.match(/^r\d+$/i)) {
-        // Register
-        const regNum = parseInt(expr.substr(1));
-        return vm.registers[regNum];
-    } else if (expr === 'pc') {
-        return vm.pc;
-    } else if (expr === 'sp') {
-        return vm.sp;
-    } else if (expr.match(/^\[.+\]$/)) {
-        // Memory access
-        const inner = expr.slice(1, -1);
-        const addr = evaluateExpression(vm, inner, symbols);
-        return vm.readWord(addr);
-    } else if (expr.startsWith('0x')) {
-        // Hex constant
-        return parseInt(expr, 16);
-    } else {
-        // Decimal constant or symbol
-        const value = parseInt(expr);
-        if (!isNaN(value)) {
-            return value;
+class ExprEvaluator {
+    constructor(lookupFn = (name) => 0) {
+        this.lookup = lookupFn;
+    }
+
+    evaluate(expr) {
+        const tokens = this.tokenize(expr);
+        const rpn = this.toRPN(tokens);
+        return this.evalRPN(rpn);
+    }
+
+    tokenize(expr) {
+        const regex = /\s*([A-Za-z_][\w]*|\d+|[-+*/%()])/g;
+        const tokens = [];
+        let match;
+        while ((match = regex.exec(expr))) {
+            tokens.push(match[1]);
         }
-        
-        // Check symbols
-        if (symbols.has(expr)) {
-            return symbols.get(expr);
+        return tokens;
+    }
+
+    toRPN(tokens) {
+        const output = [];
+        const ops = [];
+        const prec = { '+': 1, '-': 1, '*': 2, '/': 2, '%': 2 };
+
+        for (let token of tokens) {
+            if (/^\d+$/.test(token)) {
+                output.push(Number(token));
+            } else if (/^[A-Za-z_]\w*$/.test(token)) {
+                output.push({ var: token });
+            } else if (token in prec) {
+                while (ops.length && prec[ops.at(-1)] >= prec[token]) {
+                    output.push(ops.pop());
+                }
+                ops.push(token);
+            } else if (token === '(') {
+                ops.push(token);
+            } else if (token === ')') {
+                while (ops.length && ops.at(-1) !== '(') {
+                    output.push(ops.pop());
+                }
+                ops.pop(); // remove '('
+            }
         }
-        
-        throw new Error(`Unknown expression: ${expr}`);
+        return output.concat(ops.reverse());
+    }
+
+    evalRPN(rpn) {
+        const stack = [];
+        for (let token of rpn) {
+            if (typeof token === 'number') {
+                stack.push(token);
+            } else if (typeof token === 'object' && token.var) {
+                stack.push(Number(this.lookup(token.var) ?? 0));
+            } else {
+                const b = stack.pop();
+                const a = stack.pop();
+                switch (token) {
+                    case '+': stack.push(a + b); break;
+                    case '-': stack.push(a - b); break;
+                    case '*': stack.push(a * b); break;
+                    case '/': stack.push(Math.floor(a / b)); break;
+                    case '%': stack.push(a % b); break;
+                }
+            }
+        }
+        return stack[0];
     }
 }
 
-function parseAddress(str) {
-    if (str.startsWith('0x')) {
-        return parseInt(str, 16);
-    } else {
-        return parseInt(str);
-    }
-}
-
-function parseValue(str) {
-    if (str.startsWith('0x')) {
-        return parseInt(str, 16);
-    } else if (str.startsWith("'") && str.endsWith("'")) {
-        return str.charCodeAt(1);
-    } else {
-        return parseInt(str);
-    }
-}
-
-function parseRegister(str) {
-    return str.toLowerCase();
-}
-
-module.exports = {
-    evaluateExpression,
-    parseAddress,
-    parseValue,
-    parseRegister
-};
+module.exports = { ExprEvaluator }

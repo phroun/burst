@@ -4,6 +4,7 @@
 const readline = require('readline');
 const { BurstVM, BurstAssembler, OPCODES } = require('./burst-vm.js');
 const CommandHandlers = require('./repl/command-handlers');
+const { disassembleInstruction } = require('./repl/disassembler');
 const ShellCommands = require('./repl/shell-commands');
 const AssemblyCommands = require('./repl/assembly-commands');
 const OptionCommands = require('./repl/option-commands');
@@ -21,6 +22,7 @@ class BurstREPL {
         this.vm = new BurstVM();
         this.assembler = new BurstAssembler();
         this.debugger = new Debugger(this.vm);
+        this.disassembler = { disassembleInstruction };
         
         // Command history
         this.history = [];

@@ -127,7 +127,7 @@ function createCompleter(repl) {
             const expandedPartial = PlatformUtils.expandTilde(partial);
             
             // Commands that take file arguments
-            const fileCommands = ['load', 'save', 'assemble', 'cat', 'edit', 'cd', 'ls'];
+            const fileCommands = ['bload', 'bsave', 'assemble', 'cat', 'edit', 'cd', 'ls'];
             if (fileCommands.includes(cmd)) {
                 // Special case: if partial is exactly '..' add trailing slash
                 if (partial === '..') {

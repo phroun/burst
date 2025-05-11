@@ -2,7 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { parseAddress, parseValue, parseRegister } = require('./expression-evaluator');
+const { parseAddress, parseValue, parseRegister, evaluateExpression } = require('./vm-expression-evaluator');
+const { ExprEvaluator } = require('./expression-evaluator');
 const helpSystem = require('./help-system');
 
 class CommandHandlers {
@@ -223,7 +224,7 @@ class CommandHandlers {
             
             const pc = this.vm.pc;
             const instruction = this.vm.readWord(pc);
-            const disasm = this.repl.disassembleInstruction(pc, instruction);
+            const disasm = this.repl.disassembler.disassembleInstruction(this.vm, pc, instruction);
             console.log(`0x${pc.toString(16).padStart(8, '0')}: ${disasm}`);
 
             this.vm.step();
@@ -322,9 +323,9 @@ class CommandHandlers {
         }
         
         const expr = args.join(' ');
-        const { evaluateExpression } = require('./expression-evaluator');
+        const exprEval = new ExprEvaluator((n) => { if (n == 'x') return 100; return n; });
         try {
-            const value = evaluateExpression(this.vm, expr, this.debugger.symbols);
+            const value = evaluateExpression(this.vm, exprEval.evaluate(expr), this.debugger.symbols);
             console.log(`${expr} = 0x${value.toString(16)} (${value})`);
         } catch (error) {
             console.error(`Error evaluating expression: ${error.message}`);
@@ -370,7 +371,7 @@ class CommandHandlers {
         let currentAddr = addr;
         for (let i = 0; i < count; i++) {
             const instruction = this.vm.readWord(currentAddr);
-            const disasm = this.repl.disassembleInstruction(currentAddr, instruction);
+            const disasm = this.repl.disassembler.disassembleInstruction(this.vm, currentAddr, instruction);
             lines.push(`0x${currentAddr.toString(16).padStart(8, '0')}: ${disasm}`);
             currentAddr += 4;
         }

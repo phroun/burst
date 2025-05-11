@@ -39,7 +39,7 @@ async function testDirectInstructions() {
     let addr = 0;
     for (let i = 0; i < instructions.length; i++) {
         const instruction = repl.vm.readWord(addr);
-        const disasm = repl.disassembleInstruction(addr, instruction);
+        const disasm = repl.disassembler.disassembleInstruction(repl.vm, addr, instruction);
         console.log(`0x${addr.toString(16).padStart(8, '0')}: ${disasm}`);
         addr += 4;
     }
