@@ -4,6 +4,12 @@ class HelpSystem {
     constructor() {
         this.commands = new Map();
         this.categories = new Map();
+        this.pager = null; // Will be set by REPL
+    }
+    
+    // Set the pager instance
+    setPager(pager) {
+        this.pager = pager;
     }
     
     // Register a command with its help
@@ -93,14 +99,23 @@ class HelpSystem {
     }
     
     // Show help
-    showHelp(args) {
+    async showHelp(args) {
         if (args.length === 0) {
-            console.log(this.getGeneralHelp());
+            const help = this.getGeneralHelp();
+            if (this.pager && this.pager.shouldPaginate(help)) {
+                await this.pager.paginate(help);
+            } else {
+                console.log(help);
+            }
         } else {
             const cmd = args[0].toLowerCase();
             const help = this.getCommandHelp(cmd);
             if (help) {
-                console.log(help);
+                if (this.pager && this.pager.shouldPaginate(help)) {
+                    await this.pager.paginate(help);
+                } else {
+                    console.log(help);
+                }
             } else {
                 console.log(`No help available for: ${cmd}`);
             }

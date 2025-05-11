@@ -165,6 +165,7 @@ class ShellCommands {
             
             if (showDetails) {
                 // Show detailed listing
+                const lines = [];
                 for (const file of filteredFiles) {
                     let fullPath;
                     if (file === '.') {
@@ -181,10 +182,17 @@ class ShellCommands {
                         const size = stats.size.toString().padStart(10);
                         const mtime = PlatformUtils.formatFileDate(stats.mtime);
                         const isDir = stats.isDirectory();
-                        console.log(`${mode} ${size} ${mtime} ${file}${(isDir && file !== '.' && file !== '..') ? '/' : ''}`);
+                        lines.push(`${mode} ${size} ${mtime} ${file}${(isDir && file !== '.' && file !== '..') ? '/' : ''}`);
                     } catch (error) {
-                        console.log(`?????????? ${file}`);
+                        lines.push(`?????????? ${file}`);
                     }
+                }
+                
+                // Use pagination for detailed listing
+                if (this.repl.pager && this.repl.pager.shouldPaginate(lines)) {
+                    await this.repl.pager.paginate(lines);
+                } else {
+                    console.log(lines.join('\n'));
                 }
             } else {
                 // Simple listing with columns
@@ -214,13 +222,27 @@ class ShellCommands {
             return;
         }
         
+        const allContent = [];
+        
         for (const arg of args) {
             const filepath = this.getAbsolutePath(arg);
             try {
                 const content = fs.readFileSync(filepath, 'utf8');
-                console.log(content);
+                if (args.length > 1) {
+                    allContent.push(`==> ${arg} <==`);
+                }
+                allContent.push(content);
             } catch (error) {
                 console.error(`cat: ${arg}: ${error.message}`);
+            }
+        }
+        
+        if (allContent.length > 0) {
+            const combinedContent = allContent.join('\n');
+            if (this.repl.pager && this.repl.pager.shouldPaginate(combinedContent)) {
+                await this.repl.pager.paginate(combinedContent);
+            } else {
+                console.log(combinedContent);
             }
         }
     }

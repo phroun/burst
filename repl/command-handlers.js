@@ -191,16 +191,16 @@ class CommandHandlers {
         };
     }
     
-    // Command: help
-    cmdHelp(args) {
-        helpSystem.showHelp(args);
+    // Command: help - fixed as async
+    async cmdHelp(args) {
+        await helpSystem.showHelp(args);
     }
     
-    // Command: run
-    cmdRun(args) {
+    // Command: run  
+    async cmdRun(args) {
         if (args.length > 0) {
             // Load and run file
-            this.cmdLoad(args);
+            await this.cmdLoad(args);
         }
         
         console.log('Running...');
@@ -212,7 +212,7 @@ class CommandHandlers {
     }
     
     // Command: step
-    cmdStep(args) {
+    async cmdStep(args) {
         const count = args.length > 0 ? parseInt(args[0]) : 1;
         
         for (let i = 0; i < count; i++) {
@@ -231,7 +231,7 @@ class CommandHandlers {
     }
     
     // Command: continue
-    cmdContinue(args) {
+    async cmdContinue(args) {
         if (this.vm.halted) {
             console.log('Program already halted');
             return;
@@ -241,7 +241,7 @@ class CommandHandlers {
     }
     
     // Command: break
-    cmdBreak(args) {
+    async cmdBreak(args) {
         if (args.length === 0) {
             // List breakpoints
             this.debugger.listBreakpoints();
@@ -253,7 +253,7 @@ class CommandHandlers {
     }
     
     // Command: watch
-    cmdWatch(args) {
+    async cmdWatch(args) {
         if (args.length === 0) {
             // List watchpoints
             this.debugger.listWatchpoints();
@@ -265,7 +265,7 @@ class CommandHandlers {
     }
     
     // Command: info
-    cmdInfo(args) {
+    async cmdInfo(args) {
         if (args.length === 0) {
             console.log('Usage: info <regs|mem|breaks>');
             return;
@@ -296,7 +296,7 @@ class CommandHandlers {
     }
     
     // Command: print
-    cmdPrint(args) {
+    async cmdPrint(args) {
         if (args.length === 0) {
             console.log('Usage: print <expression>');
             return;
@@ -313,7 +313,7 @@ class CommandHandlers {
     }
     
     // Command: set
-    cmdSet(args) {
+    async cmdSet(args) {
         if (args.length < 2) {
             console.log('Usage: set <register> <value>');
             return;
@@ -342,22 +342,30 @@ class CommandHandlers {
         console.log(`${reg} = 0x${value.toString(16)}`);
     }
     
-    // Command: disasm
-    cmdDisasm(args) {
+    // Command: disasm - fixed as async
+    async cmdDisasm(args) {
         const addr = args.length > 0 ? parseAddress(args[0]) : this.vm.pc;
         const count = args.length > 1 ? parseInt(args[1]) : 10;
         
+        const lines = [];
         let currentAddr = addr;
         for (let i = 0; i < count; i++) {
             const instruction = this.vm.readWord(currentAddr);
             const disasm = this.repl.disassembleInstruction(currentAddr, instruction);
-            console.log(`0x${currentAddr.toString(16).padStart(8, '0')}: ${disasm}`);
+            lines.push(`0x${currentAddr.toString(16).padStart(8, '0')}: ${disasm}`);
             currentAddr += 4;
+        }
+        
+        // Use pagination for disassembly
+        if (this.repl.pager && this.repl.pager.shouldPaginate(lines)) {
+            await this.repl.pager.paginate(lines);
+        } else {
+            console.log(lines.join('\n'));
         }
     }
     
-    // Command: load
-    cmdLoad(args) {
+    // Command: load - fixed as async
+    async cmdLoad(args) {
         if (args.length === 0) {
             console.log('Usage: load <file>');
             return;
@@ -373,8 +381,8 @@ class CommandHandlers {
         }
     }
     
-    // Command: save
-    cmdSave(args) {
+    // Command: save 
+    async cmdSave(args) {
         if (args.length === 0) {
             console.log('Usage: save <file>');
             return;
@@ -390,7 +398,7 @@ class CommandHandlers {
     }
     
     // Command: reset
-    cmdReset(args) {
+    async cmdReset(args) {
         const { BurstVM } = require('../burst-vm');
         const { Debugger } = require('./debugger');
         
@@ -400,7 +408,7 @@ class CommandHandlers {
     }
     
     // Command: quit
-    cmdQuit(args) {
+    async cmdQuit(args) {
         this.repl.rl.close();
     }
 }

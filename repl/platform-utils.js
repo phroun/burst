@@ -123,6 +123,21 @@ class PlatformUtils {
 # alias.vi = edit
 # alias.vim = edit
 # alias.nano = edit
+
+# Configuration Options
+# These control various behaviors of the REPL
+#
+# Enable output pagination for long content (true/false)
+option.paginate = true
+#
+# Number of lines per page in pagination
+# option.pageSize = 24
+#
+# Preserve screen content before pagination (true/false)
+option.preserveScreen = true
+#
+# Leave paginated content visible after exit (true/false)
+option.leaveContentVisible = true
 `;
     }
     
@@ -131,7 +146,8 @@ class PlatformUtils {
         const configPath = this.getConfigPath();
         const config = {
             editor: null,
-            aliases: {}
+            aliases: {},
+            options: {}
         };
         
         try {
@@ -161,6 +177,11 @@ class PlatformUtils {
                     const match = trimmed.match(/^alias\.([^\s=]+)\s*=\s*(.+)$/);
                     if (match) {
                         config.aliases[match[1].trim()] = match[2].trim();
+                    }
+                } else if (trimmed.startsWith('option.')) {
+                    const match = trimmed.match(/^option\.([^\s=]+)\s*=\s*(.+)$/);
+                    if (match) {
+                        config.options[match[1].trim()] = match[2].trim();
                     }
                 }
             }
