@@ -1,9 +1,11 @@
-// Shell-like commands for BURST REPL
+// Shell-like commands for BURST REPL - Updated with custom glob matching
 
 const fs = require('fs');
 const path = require('path');
 const helpSystem = require('./help-system');
 const PlatformUtils = require('./platform-utils');
+const { spawn } = require('child_process');
+const glob = require('./glob-matcher');
 
 class ShellCommands {
     constructor(repl) {
@@ -41,13 +43,19 @@ class ShellCommands {
         
         helpSystem.registerCommand('ls', {
             description: 'List directory contents',
-            usage: 'ls [options] [directory]',
+            usage: 'ls [options] [path|pattern]',
             examples: [
                 'ls',
-                'ls -l          # Detailed listing',
-                'ls -a          # Show hidden files',
-                'ls -la         # Both detailed and hidden',
-                'ls ~/projects  # List specific directory'
+                'ls -l              # Detailed listing',
+                'ls -a              # Show hidden files',
+                'ls -la             # Both detailed and hidden',
+                'ls ~/projects      # List specific directory',
+                'ls myfile.txt      # Show specific file',
+                'ls *.asm           # List files matching pattern',
+                'ls src/*.js        # List matching files in directory',
+                'ls test?.txt       # Match single character',
+                'ls [abc]*.txt      # Character class matching',
+                'ls {src,test}/*.js # Brace expansion'
             ],
             category: 'Shell'
         });
@@ -132,6 +140,7 @@ class ShellCommands {
         let targetPath = this.cwd;
         let showHidden = false;
         let showDetails = false;
+        let targetPattern = null;
         
         // Parse arguments
         const paths = [];
@@ -144,17 +153,47 @@ class ShellCommands {
             }
         }
         
-        // If paths specified, use the first one
+        // Process the path/pattern argument
         if (paths.length > 0) {
-            targetPath = this.getAbsolutePath(paths[0]);
+            const pathArg = paths[0];
+            
+            // Check if the argument contains glob characters
+            if (glob.hasGlobChars(pathArg)) {
+                // Split into directory and pattern
+                const { dir, pattern } = glob.splitPath(pathArg);
+                targetPath = this.getAbsolutePath(dir);
+                targetPattern = pattern;
+            } else {
+                // It's a regular path - could be file or directory
+                const fullPath = this.getAbsolutePath(pathArg);
+                
+                try {
+                    const stats = fs.statSync(fullPath);
+                    if (stats.isDirectory()) {
+                        targetPath = fullPath;
+                    } else {
+                        // It's a file - list just that file
+                        await this.listSingleFile(fullPath, pathArg, showDetails);
+                        return;
+                    }
+                } catch (error) {
+                    console.error(`ls: ${pathArg}: ${error.message}`);
+                    return;
+                }
+            }
         }
         
         try {
             let files = fs.readdirSync(targetPath);
             
-            // Add . and .. if showing hidden files
-            if (showHidden) {
+            // Add . and .. if showing hidden files and no pattern
+            if (showHidden && !targetPattern) {
                 files = ['.', '..', ...files];
+            }
+            
+            // Apply pattern filtering if specified
+            if (targetPattern) {
+                files = glob.filter(files, targetPattern);
             }
             
             // Filter hidden files unless -a
@@ -162,6 +201,11 @@ class ShellCommands {
             
             // Sort files
             filteredFiles.sort();
+            
+            if (filteredFiles.length === 0 && targetPattern) {
+                console.log(`ls: No match for pattern '${targetPattern}'`);
+                return;
+            }
             
             if (showDetails) {
                 // Show detailed listing
@@ -190,7 +234,7 @@ class ShellCommands {
                 
                 // Use pagination for detailed listing
                 if (this.repl.pager && this.repl.pager.shouldPaginate(lines)) {
-                    await this.repl.pager.paginate(lines);
+                    await this.repl.pager.paginate(lines, this.repl.rl);
                 } else {
                     console.log(lines.join('\n'));
                 }
@@ -212,6 +256,24 @@ class ShellCommands {
             }
         } catch (error) {
             console.error(`ls: ${targetPath}: ${error.message}`);
+        }
+    }
+    
+    // Helper method to list a single file
+    async listSingleFile(fullPath, displayName, showDetails) {
+        try {
+            const stats = fs.statSync(fullPath);
+            
+            if (showDetails) {
+                const mode = this.formatFileMode(stats);
+                const size = stats.size.toString().padStart(10);
+                const mtime = PlatformUtils.formatFileDate(stats.mtime);
+                console.log(`${mode} ${size} ${mtime} ${displayName}`);
+            } else {
+                console.log(displayName);
+            }
+        } catch (error) {
+            console.error(`ls: ${displayName}: ${error.message}`);
         }
     }
     
@@ -240,7 +302,8 @@ class ShellCommands {
         if (allContent.length > 0) {
             const combinedContent = allContent.join('\n');
             if (this.repl.pager && this.repl.pager.shouldPaginate(combinedContent)) {
-                await this.repl.pager.paginate(combinedContent);
+                // Use paginate directly - no need for pauseReadline
+                await this.repl.pager.paginate(combinedContent, this.repl.rl);
             } else {
                 console.log(combinedContent);
             }
@@ -259,22 +322,70 @@ class ShellCommands {
         const filepath = this.getAbsolutePath(args[0]);
         
         console.log(`Launching ${editor} for ${filepath}...`);
-        console.log('(Use Ctrl+Z to suspend and "fg" to resume when done)');
         
-        // Create a child process for the editor
-        const { spawn } = require('child_process');
-        const child = spawn(editor, [filepath], {
-            stdio: 'inherit',
-            shell: true
-        });
-        
-        // Pause the REPL while editor is running
-        this.repl.rl.pause();
-        
-        child.on('exit', (code) => {
-            console.log(`Editor exited with code ${code}`);
-            this.repl.rl.resume();
-            this.repl.rl.prompt();
+        // Properly handle external command execution
+        return new Promise((resolve) => {
+            // Pause the REPL while editor is running
+            this.repl.rl.pause();
+            
+            // Completely remove keypress handlers to avoid input conflicts
+            const keypressListeners = process.stdin.listeners('keypress');
+            const dataListeners = process.stdin.listeners('data');
+            process.stdin.removeAllListeners('keypress');
+            process.stdin.removeAllListeners('data');
+            
+            // Save and disable raw mode
+            const wasRaw = process.stdin.isRaw;
+            if (wasRaw && process.stdin.setRawMode) {
+                process.stdin.setRawMode(false);
+            }
+            
+            const child = spawn(editor, [filepath], {
+                stdio: 'inherit',
+                shell: true
+            });
+            
+            child.on('exit', (code) => {
+                console.log(`Editor exited with code ${code}`);
+                
+                // Restore raw mode
+                if (wasRaw && process.stdin.setRawMode) {
+                    process.stdin.setRawMode(true);
+                }
+                
+                // Restore listeners
+                keypressListeners.forEach(listener => {
+                    process.stdin.on('keypress', listener);
+                });
+                dataListeners.forEach(listener => {
+                    process.stdin.on('data', listener);
+                });
+                
+                // Resume the REPL
+                this.repl.rl.resume();
+                this.repl.rl.prompt();
+                resolve();
+            });
+            
+            child.on('error', (err) => {
+                console.error(`Failed to launch editor: ${err.message}`);
+                
+                // Restore everything on error as well
+                if (wasRaw && process.stdin.setRawMode) {
+                    process.stdin.setRawMode(true);
+                }
+                
+                keypressListeners.forEach(listener => {
+                    process.stdin.on('keypress', listener);
+                });
+                dataListeners.forEach(listener => {
+                    process.stdin.on('data', listener);
+                });
+                
+                this.repl.rl.resume();
+                this.repl.rl.prompt();
+                resolve();
+            });
         });
     }
     
@@ -288,20 +399,69 @@ class ShellCommands {
         const command = args.join(' ');
         console.log(`Executing: ${command}`);
         
-        const { spawn } = require('child_process');
-        const child = spawn(command, [], {
-            stdio: 'inherit',
-            shell: true,
-            cwd: this.cwd
-        });
-        
-        // Pause the REPL while command is running
-        this.repl.rl.pause();
-        
-        child.on('exit', (code) => {
-            console.log(`Command exited with code ${code}`);
-            this.repl.rl.resume();
-            this.repl.rl.prompt();
+        return new Promise((resolve) => {
+            // Pause the REPL while command is running
+            this.repl.rl.pause();
+            
+            // Completely remove keypress handlers to avoid input conflicts
+            const keypressListeners = process.stdin.listeners('keypress');
+            const dataListeners = process.stdin.listeners('data');
+            process.stdin.removeAllListeners('keypress');
+            process.stdin.removeAllListeners('data');
+            
+            // Save and disable raw mode
+            const wasRaw = process.stdin.isRaw;
+            if (wasRaw && process.stdin.setRawMode) {
+                process.stdin.setRawMode(false);
+            }
+            
+            const child = spawn(command, [], {
+                stdio: 'inherit',
+                shell: true,
+                cwd: this.cwd
+            });
+            
+            child.on('exit', (code) => {
+                console.log(`Command exited with code ${code}`);
+                
+                // Restore raw mode
+                if (wasRaw && process.stdin.setRawMode) {
+                    process.stdin.setRawMode(true);
+                }
+                
+                // Restore listeners
+                keypressListeners.forEach(listener => {
+                    process.stdin.on('keypress', listener);
+                });
+                dataListeners.forEach(listener => {
+                    process.stdin.on('data', listener);
+                });
+                
+                // Resume the REPL
+                this.repl.rl.resume();
+                this.repl.rl.prompt();
+                resolve();
+            });
+            
+            child.on('error', (err) => {
+                console.error(`Failed to execute command: ${err.message}`);
+                
+                // Restore everything on error as well
+                if (wasRaw && process.stdin.setRawMode) {
+                    process.stdin.setRawMode(true);
+                }
+                
+                keypressListeners.forEach(listener => {
+                    process.stdin.on('keypress', listener);
+                });
+                dataListeners.forEach(listener => {
+                    process.stdin.on('data', listener);
+                });
+                
+                this.repl.rl.resume();
+                this.repl.rl.prompt();
+                resolve();
+            });
         });
     }
     

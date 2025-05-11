@@ -1,4 +1,4 @@
-// Command handlers for BURST REPL
+// Command handlers for BURST REPL - Updated with pagination for info
 
 const fs = require('fs');
 const path = require('path');
@@ -191,7 +191,7 @@ class CommandHandlers {
         };
     }
     
-    // Command: help - fixed as async
+    // Command: help
     async cmdHelp(args) {
         await helpSystem.showHelp(args);
     }
@@ -225,7 +225,7 @@ class CommandHandlers {
             const instruction = this.vm.readWord(pc);
             const disasm = this.repl.disassembleInstruction(pc, instruction);
             console.log(`0x${pc.toString(16).padStart(8, '0')}: ${disasm}`);
-            
+
             this.vm.step();
         }
     }
@@ -264,7 +264,7 @@ class CommandHandlers {
         }
     }
     
-    // Command: info
+    // Command: info - Updated with pagination
     async cmdInfo(args) {
         if (args.length === 0) {
             console.log('Usage: info <regs|mem|breaks>');
@@ -274,14 +274,33 @@ class CommandHandlers {
         switch (args[0].toLowerCase()) {
             case 'regs':
             case 'registers':
+                // For registers, use direct output (usually short)
                 this.vm.dumpRegisters();
                 break;
                 
             case 'mem':
             case 'memory':
+                // For memory, collect lines and paginate if needed
                 const addr = args.length > 1 ? parseAddress(args[1]) : this.vm.pc;
                 const length = args.length > 2 ? parseInt(args[2]) : 64;
-                this.vm.dumpMemory(addr, length);
+                
+                // Capture memory dump output
+                const originalConsoleLog = console.log;
+                const lines = [];
+                console.log = (line) => lines.push(line);
+                
+                try {
+                    this.vm.dumpMemory(addr, length);
+                } finally {
+                    console.log = originalConsoleLog;
+                }
+                
+                // Use pagination if needed
+                if (this.repl.pager && this.repl.pager.shouldPaginate(lines)) {
+                    await this.repl.pager.paginate(lines, this.repl.rl);
+                } else {
+                    console.log(lines.join('\n'));
+                }
                 break;
                 
             case 'breaks':
@@ -342,7 +361,7 @@ class CommandHandlers {
         console.log(`${reg} = 0x${value.toString(16)}`);
     }
     
-    // Command: disasm - fixed as async
+    // Command: disasm
     async cmdDisasm(args) {
         const addr = args.length > 0 ? parseAddress(args[0]) : this.vm.pc;
         const count = args.length > 1 ? parseInt(args[1]) : 10;
@@ -358,13 +377,13 @@ class CommandHandlers {
         
         // Use pagination for disassembly
         if (this.repl.pager && this.repl.pager.shouldPaginate(lines)) {
-            await this.repl.pager.paginate(lines);
+            await this.repl.pager.paginate(lines, this.repl.rl);
         } else {
             console.log(lines.join('\n'));
         }
     }
     
-    // Command: load - fixed as async
+    // Command: load
     async cmdLoad(args) {
         if (args.length === 0) {
             console.log('Usage: load <file>');
@@ -409,7 +428,9 @@ class CommandHandlers {
     
     // Command: quit
     async cmdQuit(args) {
-        this.repl.rl.close();
+        if (this.repl.rl) {
+            this.repl.rl.close();
+        }
     }
 }
 

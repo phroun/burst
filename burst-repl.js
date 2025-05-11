@@ -1,4 +1,4 @@
-// BURST VM REPL and Command Interpreter
+// BURST VM REPL and Command Interpreter - Fixed version
 // Interactive environment for BURST VM
 
 const readline = require('readline');
@@ -38,6 +38,7 @@ class BurstREPL {
         
         // Set pager in help system
         helpSystem.setPager(this.pager);
+        helpSystem.setRepl(this);
         
         // Create the completer function
         this.completerFn = createCompleter(this);
@@ -47,7 +48,8 @@ class BurstREPL {
             input: process.stdin,
             output: process.stdout,
             prompt: 'burst> ',
-            completer: this.completerFn
+            completer: this.completerFn,
+            terminal: true
         });
         
         // Initialize command handlers
@@ -77,7 +79,16 @@ class BurstREPL {
         console.log('Type "help" for commands');
         console.log('');
         
-        this.rl.prompt();
+        // Handle CTRL+C - cancel current input instead of exiting
+        this.rl.on('SIGINT', () => {
+            // Clear current line input
+            this.rl.line = '';
+            this.rl.cursor = 0;
+            
+            // Show ^C and new prompt on new line
+            console.log('^C');
+            this.rl.prompt(true);
+        });
         
         this.rl.on('line', async (line) => {
             await this.handleCommand(line.trim());
@@ -87,6 +98,8 @@ class BurstREPL {
             console.log('\nGoodbye!');
             process.exit(0);
         });
+        
+        this.rl.prompt();
     }
     
     // Handle command input

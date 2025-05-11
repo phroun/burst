@@ -130,9 +130,6 @@ class PlatformUtils {
 # Enable output pagination for long content (true/false)
 option.paginate = true
 #
-# Number of lines per page in pagination
-# option.pageSize = 24
-#
 # Preserve screen content before pagination (true/false)
 option.preserveScreen = true
 #

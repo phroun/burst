@@ -5,11 +5,17 @@ class HelpSystem {
         this.commands = new Map();
         this.categories = new Map();
         this.pager = null; // Will be set by REPL
+        this.repl = null; // Reference to REPL instance
     }
     
     // Set the pager instance
     setPager(pager) {
         this.pager = pager;
+    }
+    
+    // Set the REPL instance
+    setRepl(repl) {
+        this.repl = repl;
     }
     
     // Register a command with its help
@@ -102,8 +108,8 @@ class HelpSystem {
     async showHelp(args) {
         if (args.length === 0) {
             const help = this.getGeneralHelp();
-            if (this.pager && this.pager.shouldPaginate(help)) {
-                await this.pager.paginate(help);
+            if (this.pager && this.repl && this.pager.shouldPaginate(help)) {
+                await this.pager.paginate(help, this.repl.rl);
             } else {
                 console.log(help);
             }
@@ -111,8 +117,8 @@ class HelpSystem {
             const cmd = args[0].toLowerCase();
             const help = this.getCommandHelp(cmd);
             if (help) {
-                if (this.pager && this.pager.shouldPaginate(help)) {
-                    await this.pager.paginate(help);
+                if (this.pager && this.repl && this.pager.shouldPaginate(help)) {
+                    await this.pager.paginate(help, this.repl.rl);
                 } else {
                     console.log(help);
                 }
