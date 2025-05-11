@@ -15,16 +15,6 @@ class OptionCommands {
                 description: 'Enable output pagination for long content',
                 type: 'boolean'
             },
-            preserveScreen: {
-                value: true,
-                description: 'Preserve screen content before pagination',
-                type: 'boolean'
-            },
-            leaveContentVisible: {
-                value: true,
-                description: 'Leave paginated content visible after exit',
-                type: 'boolean'
-            },
             pagerDebug: {
                 value: false,
                 description: 'Show debug info in pager (dimensions, line numbers)',
@@ -141,11 +131,9 @@ class OptionCommands {
     // Update systems that depend on options
     updateDependentSystems(optionName) {
         // Update pager options if pagination-related options changed
-        if (['paginate', 'preserveScreen', 'leaveContentVisible', 'pagerDebug'].includes(optionName)) {
+        if (['paginate', 'pagerDebug'].includes(optionName)) {
             if (this.repl.pager) {
                 this.repl.pager.enabled = this.options.paginate.value;
-                this.repl.pager.preserveScreen = this.options.preserveScreen.value;
-                this.repl.pager.leaveContentVisible = this.options.leaveContentVisible.value;
                 this.repl.pager.debug = this.options.pagerDebug.value;
             }
         }
@@ -161,8 +149,6 @@ class OptionCommands {
     getPagerOptions() {
         return {
             enabled: this.options.paginate.value,
-            preserveScreen: this.options.preserveScreen.value,
-            leaveContentVisible: this.options.leaveContentVisible.value,
             debug: this.options.pagerDebug.value
         };
     }

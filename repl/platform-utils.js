@@ -12,8 +12,10 @@ class PlatformUtils {
         
         // Handle platform-specific home directory patterns
         if (process.platform === 'win32') {
-            // Windows: C:\Users\username
-            return path.join('C:', 'Users', username);
+            // Windows: Use USERPROFILE environment variable to determine base path
+            const userProfileBase = process.env.USERPROFILE ? 
+                path.dirname(process.env.USERPROFILE) : 'C:\\Users';
+            return path.join(userProfileBase, username);
         } else {
             // Unix-like: /home/username or /Users/username (macOS)
             if (process.platform === 'darwin') {
@@ -62,23 +64,38 @@ class PlatformUtils {
         return filepath;
     }
     
-    // Get list of users for tilde completion (Unix-like systems)
+    // Get list of users for tilde completion
     static getUsernames() {
         if (process.platform === 'win32') {
-            // Windows doesn't have a simple way to list users
-            return [];
-        }
-        
-        try {
-            // Try to read from /etc/passwd
-            const passwd = fs.readFileSync('/etc/passwd', 'utf8');
-            const users = passwd.split('\n')
-                .filter(line => line.trim())
-                .map(line => line.split(':')[0])
-                .filter(user => user);
-            return users;
-        } catch {
-            return [];
+            // Windows: Try to list directories in the Users folder
+            try {
+                const userProfileBase = process.env.USERPROFILE ? 
+                    path.dirname(process.env.USERPROFILE) : 'C:\\Users';
+                const users = fs.readdirSync(userProfileBase)
+                    .filter(name => {
+                        const userPath = path.join(userProfileBase, name);
+                        try {
+                            return fs.statSync(userPath).isDirectory();
+                        } catch {
+                            return false;
+                        }
+                    });
+                return users;
+            } catch {
+                return [];
+            }
+        } else {
+            // Unix-like systems: read from /etc/passwd
+            try {
+                const passwd = fs.readFileSync('/etc/passwd', 'utf8');
+                const users = passwd.split('\n')
+                    .filter(line => line.trim())
+                    .map(line => line.split(':')[0])
+                    .filter(user => user);
+                return users;
+            } catch {
+                return [];
+            }
         }
     }
     
@@ -129,12 +146,6 @@ class PlatformUtils {
 #
 # Enable output pagination for long content (true/false)
 option.paginate = true
-#
-# Preserve screen content before pagination (true/false)
-option.preserveScreen = true
-#
-# Leave paginated content visible after exit (true/false)
-option.leaveContentVisible = true
 `;
     }
     

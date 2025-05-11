@@ -1,11 +1,12 @@
-// Tab completion module for BURST REPL
+// Tab completion module for BURST REPL - Fixed display
 
 const fs = require('fs');
 const path = require('path');
 const PlatformUtils = require('./platform-utils');
 
 function createCompleter(repl) {
-    return function completer(line) {
+    // Store the actual completer function
+    const actualCompleter = function(line) {
         // First try command completion
         const commands = Object.keys(repl.commands);
         let hits = commands.filter(cmd => cmd.startsWith(line));
@@ -231,6 +232,86 @@ function createCompleter(repl) {
         
         return [hits, line];
     };
+
+// Wrapper function that intercepts the display
+    return function(line, callback) {
+        // Get completions from the actual completer
+        const [completions, originalLine] = actualCompleter(line);
+        
+        // Check if this is being called with a callback (for display)
+        if (callback) {
+            // If we have multiple completions
+            if (completions.length > 1) {
+                let displayCompletions = completions;
+                
+                // For command completions (with space)
+                if (line.includes(' ')) {
+                    const parts = line.split(' ');
+                    const beforeLastPart = parts.slice(0, -1).join(' ') + ' ';
+                    const lastPart = parts[parts.length - 1];
+                    
+                    // Check if all completions start with the command prefix
+                    if (completions.every(comp => comp.startsWith(beforeLastPart))) {
+                        displayCompletions = completions.map(comp => {
+                            const afterCommand = comp.substring(beforeLastPart.length);
+                            
+                            // For path completions, find the common directory prefix
+                            if (afterCommand.includes('/') || lastPart.includes('/')) {
+                                // Find the last slash in the input to determine what's being completed
+                                const lastSlashIndex = lastPart.lastIndexOf('/');
+                                if (lastSlashIndex !== -1) {
+                                    const pathBeforeCompletion = lastPart.substring(0, lastSlashIndex + 1);
+                                    
+                                    // Remove the common path prefix from display
+                                    if (afterCommand.startsWith(pathBeforeCompletion)) {
+                                        return afterCommand.substring(pathBeforeCompletion.length);
+                                    }
+                                }
+                            }
+                            
+                            return afterCommand;
+                        });
+                    }
+                }
+                // For direct path completions (no command)
+                else if (line.includes('/')) {
+                    const lastSlashIndex = line.lastIndexOf('/');
+                    if (lastSlashIndex !== -1) {
+                        const pathBeforeCompletion = line.substring(0, lastSlashIndex + 1);
+                        
+                        // Check if all completions share this prefix
+                        if (completions.every(comp => comp.startsWith(pathBeforeCompletion))) {
+                            displayCompletions = completions.map(comp => 
+                                comp.substring(pathBeforeCompletion.length)
+                            );
+                        }
+                    }
+                }
+                
+                // Only override display if we modified the completions
+                if (displayCompletions !== completions) {
+                    // Override the default display
+                    process.stdout.write('\n');
+                    
+                    // Format in columns
+                    console.log(PlatformUtils.formatColumns(displayCompletions));
+                    
+                    // Re-display the prompt and current line
+                    repl.rl._refreshLine();
+                    
+                    // Return empty array to prevent readline from showing its own display
+                    callback(null, [[], line]);
+                    return;
+                }
+            }
+            
+            // Default behavior
+            callback(null, [completions, originalLine]);
+        } else {
+            // Synchronous mode (for actual completion)
+            return [completions, originalLine];
+        }
+    };    
 }
 
 module.exports = { createCompleter };

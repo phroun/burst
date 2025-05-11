@@ -4,7 +4,6 @@ const readline = require('readline');
 class Pager {
     constructor(options = {}) {
         this.enabled = options.enabled !== false;
-        this.leaveContentVisible = options.leaveContentVisible !== false;
         this.debug = options.debug || false;
 
         this.lines = [];
@@ -204,7 +203,7 @@ class Pager {
         this.validateCurrentLine();
     }
 
-async paginate(content, readlineInterface) {
+    async paginate(content, readlineInterface) {
         if (!this.shouldPaginate(content)) {
             console.log(content);
             return;
@@ -264,9 +263,7 @@ async paginate(content, readlineInterface) {
                 
                 this.clearPrompt();
                 
-                if (!this.leaveContentVisible) {
-                    process.stdout.write('\x1b[2J\x1b[H');
-                }
+                // Don't write a newline here - readline's prompt will handle positioning
                 
                 // Restore readline's keypress listeners
                 keypressListeners.forEach(listener => {

@@ -20,7 +20,7 @@ class CommandHandlers {
             examples: [
                 'help',
                 'help run',
-                'help load'
+                'help bload'
             ],
             category: 'General',
             aliases: ['h']
@@ -125,22 +125,22 @@ class CommandHandlers {
             aliases: ['d']
         });
         
-        helpSystem.registerCommand('load', {
-            description: 'Load program from file',
-            usage: 'load <file>',
+        helpSystem.registerCommand('bload', {
+            description: 'Load binary program from file',
+            usage: 'bload <file>',
             examples: [
-                'load program.bin',
-                'load ../tests/test1.bin'
+                'bload program.bin',
+                'bload ../tests/test1.bin'
             ],
             category: 'File Operations'
         });
         
-        helpSystem.registerCommand('save', {
-            description: 'Save memory to file',
-            usage: 'save <file>',
+        helpSystem.registerCommand('bsave', {
+            description: 'Save binary memory to file',
+            usage: 'bsave <file>',
             examples: [
-                'save memory.bin',
-                'save dump.bin'
+                'bsave memory.bin',
+                'bsave dump.bin'
             ],
             category: 'File Operations'
         });
@@ -171,8 +171,8 @@ class CommandHandlers {
             print: this.cmdPrint.bind(this),
             set: this.cmdSet.bind(this),
             disasm: this.cmdDisasm.bind(this),
-            load: this.cmdLoad.bind(this),
-            save: this.cmdSave.bind(this),
+            bload: this.cmdBLoad.bind(this),
+            bsave: this.cmdBSave.bind(this),
             reset: this.cmdReset.bind(this),
             quit: this.cmdQuit.bind(this),
             
@@ -383,10 +383,10 @@ class CommandHandlers {
         }
     }
     
-    // Command: load
-    async cmdLoad(args) {
+    // Command: bload
+    async cmdBLoad(args) {
         if (args.length === 0) {
-            console.log('Usage: load <file>');
+            console.log('Usage: bload <file>');
             return;
         }
         
@@ -396,14 +396,14 @@ class CommandHandlers {
             this.vm.loadProgram(new Uint8Array(data));
             console.log(`Loaded ${data.length} bytes from ${args[0]}`);
         } catch (error) {
-            console.error(`Failed to load file: ${error.message}`);
+            console.error(`Failed to load binary file: ${error.message}`);
         }
     }
     
     // Command: save 
-    async cmdSave(args) {
+    async cmdBSave(args) {
         if (args.length === 0) {
-            console.log('Usage: save <file>');
+            console.log('Usage: bsave <file>');
             return;
         }
         
@@ -412,7 +412,7 @@ class CommandHandlers {
             fs.writeFileSync(filename, this.vm.memory);
             console.log(`Saved ${this.vm.memory.length} bytes to ${args[0]}`);
         } catch (error) {
-            console.error(`Failed to save file: ${error.message}`);
+            console.error(`Failed to save binary file: ${error.message}`);
         }
     }
     
