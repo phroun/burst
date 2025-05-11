@@ -1,8 +1,29 @@
-// Tab completion module for BURST REPL - Fixed display
+// Tab completion module for BURST REPL - Fixed display with partial completion
 
 const fs = require('fs');
 const path = require('path');
 const PlatformUtils = require('./platform-utils');
+
+// Helper function to find the longest common prefix
+function findLongestCommonPrefix(strings) {
+    if (strings.length === 0) return '';
+    if (strings.length === 1) return strings[0];
+    
+    let prefix = '';
+    const firstString = strings[0];
+    
+    for (let i = 0; i < firstString.length; i++) {
+        const char = firstString[i];
+        for (let j = 1; j < strings.length; j++) {
+            if (i >= strings[j].length || strings[j][i] !== char) {
+                return prefix;
+            }
+        }
+        prefix += char;
+    }
+    
+    return prefix;
+}
 
 function createCompleter(repl) {
     // Store the actual completer function
@@ -233,15 +254,26 @@ function createCompleter(repl) {
         return [hits, line];
     };
 
-// Wrapper function that intercepts the display
+    // Wrapper function that intercepts the display and handles partial completion
     return function(line, callback) {
         // Get completions from the actual completer
         const [completions, originalLine] = actualCompleter(line);
         
         // Check if this is being called with a callback (for display)
         if (callback) {
-            // If we have multiple completions
+            // If we have multiple completions, find common prefix and complete to that
             if (completions.length > 1) {
+                // Find the longest common prefix among all completions
+                const commonPrefix = findLongestCommonPrefix(completions);
+                
+                // If the common prefix is longer than what we currently have typed,
+                // return that as a single completion to trigger partial completion
+                if (commonPrefix.length > line.length) {
+                    callback(null, [[commonPrefix], line]);
+                    return;
+                }
+                
+                // If we've already completed to the common prefix, show all options
                 let displayCompletions = completions;
                 
                 // For command completions (with space)
