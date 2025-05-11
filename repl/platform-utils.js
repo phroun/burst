@@ -104,8 +104,39 @@ class PlatformUtils {
         return path.join(os.homedir(), '.burst-repl.config');
     }
     
-    // Default config content
+    // Default config object
     static getDefaultConfig() {
+        return {
+            // Editor preference
+            editor: process.env.EDITOR || process.env.VISUAL || (process.platform === 'win32' ? 'notepad' : 'vi'),
+            
+            // Command aliases
+            aliases: {
+                'll': 'ls -l',
+                'la': 'ls -a',
+                'vi': 'edit',
+                'vim': 'edit',
+                'nano': 'edit',
+                'emacs': 'edit'
+            },
+            
+            // Pager configuration
+            pager: {
+                enabled: true,
+                pauseOnExit: true
+            },
+            
+            // Options
+            options: {
+                paginate: 'true',
+                pagerDebug: 'false',
+                promptColor: '11'  // Default to bright yellow
+            }
+        };
+    }
+    
+    // Default config file content
+    static getDefaultConfigContent() {
         return `# BURST REPL Configuration File
 # This file allows you to customize the behavior of the BURST REPL
 # 
@@ -134,35 +165,39 @@ class PlatformUtils {
 # alias.rd = rmdir
 
 # Here are some default aliases to get you started:
-# (uncomment to activate)
-# alias.joe = edit
-# alias.emacs = edit
-# alias.vi = edit
-# alias.vim = edit
-# alias.nano = edit
+alias.ll = ls -l
+alias.la = ls -a
+alias.vi = edit
+alias.vim = edit
+alias.nano = edit
+alias.emacs = edit
 
 # Configuration Options
 # These control various behaviors of the REPL
 #
 # Enable output pagination for long content (true/false)
 option.paginate = true
+
+# Show pager debug information (false/true)
+option.pagerDebug = false
+
+# Prompt color (0-15 for ANSI colors, or off)
+# 0=black, 1=red, 2=green, 3=yellow, 4=blue, 5=magenta, 6=cyan, 7=white
+# 8-15 are bright versions of the same colors
+option.promptColor = 11
 `;
     }
     
     // Load config file
     static loadConfig() {
         const configPath = this.getConfigPath();
-        const config = {
-            editor: null,
-            aliases: {},
-            options: {}
-        };
+        let config = this.getDefaultConfig();
         
         try {
             // Try to create default config if it doesn't exist
             if (!fs.existsSync(configPath)) {
                 try {
-                    fs.writeFileSync(configPath, this.getDefaultConfig(), 'utf8');
+                    fs.writeFileSync(configPath, this.getDefaultConfigContent(), 'utf8');
                 } catch {
                     // Silently fail if we can't write
                 }
@@ -171,6 +206,9 @@ option.paginate = true
             // Load the config
             const content = fs.readFileSync(configPath, 'utf8');
             const lines = content.split('\n');
+            
+            // Clear default aliases if we're reading from file
+            config.aliases = {};
             
             for (const line of lines) {
                 const trimmed = line.trim();
@@ -193,8 +231,9 @@ option.paginate = true
                     }
                 }
             }
-        } catch {
+        } catch (error) {
             // Return default config if we can't read
+            console.error(`Error loading config: ${error.message}`);
         }
         
         return config;

@@ -148,10 +148,10 @@ async function runTestCase(testCase) {
             
             try {
                 console.log = originalLog; // Temporarily restore for debugging
-                console.log(`  DEBUG: Calling cmdAssemble with ${tempFile}`);
+                console.log(`  DEBUG: Calling assemble with ${tempFile}`);
                 console.log = () => {}; // Suppress again
                 
-                await repl.assemblyCommands.cmdAssemble([tempFile]);
+                await repl.assemble([tempFile]);
                 
                 console.log = originalLog;
                 console.log(`  DEBUG: Assembly succeeded`);

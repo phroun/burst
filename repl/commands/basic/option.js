@@ -1,12 +1,10 @@
-// Option commands for BURST REPL
-// Manages runtime configuration options
+// Option command plugin
 
-const helpSystem = require('./help-system');
-const PlatformUtils = require('./platform-utils');
+const BaseCommand = require('../BaseCommand');
 
-class OptionCommands {
-    constructor(repl) {
-        this.repl = repl;
+class OptionCommand extends BaseCommand {
+    constructor(commandLoader) {
+        super(commandLoader);
         
         // Define available options with their defaults
         this.options = {
@@ -19,18 +17,20 @@ class OptionCommands {
                 value: false,
                 description: 'Show debug info in pager (dimensions, line numbers)',
                 type: 'boolean'
+            },
+            promptColor: {
+                value: undefined,
+                description: 'ANSI color code for prompt (0-15, or off)',
+                type: 'number'
             }
         };
         
         // Load options from config
         this.loadOptionsFromConfig();
-        
-        // Register help
-        this.registerHelp();
     }
     
     loadOptionsFromConfig() {
-        if (this.repl.config.options) {
+        if (this.repl.config && this.repl.config.options) {
             for (const [name, value] of Object.entries(this.repl.config.options)) {
                 if (this.options[name]) {
                     // Convert string values to appropriate types
@@ -38,7 +38,11 @@ class OptionCommands {
                     if (option.type === 'boolean') {
                         option.value = value === 'true' || value === true;
                     } else if (option.type === 'number') {
-                        option.value = parseInt(value) || option.value;
+                        if (value === 'off' || value === false || value === null || value === undefined) {
+                            option.value = undefined;
+                        } else {
+                            option.value = parseInt(value) || option.value;
+                        }
                     } else {
                         option.value = value;
                     }
@@ -47,36 +51,13 @@ class OptionCommands {
         }
     }
     
-    registerHelp() {
-        helpSystem.registerCommand('option', {
-            description: 'View or set configuration options',
-            usage: 'option [name] [value]',
-            examples: [
-                'option                    # List all options',
-                'option paginate           # Show current value',
-                'option paginate true      # Enable pagination',
-                'option paginate false     # Disable pagination',
-                'option pagerDebug true    # Enable pager debug info',
-            ],
-            category: 'Configuration',
-            aliases: ['opt']
-        });
-    }
-    
-    getCommands() {
-        return {
-            option: this.cmdOption.bind(this),
-            opt: this.cmdOption.bind(this)
-        };
-    }
-    
-    // Command: option
-    cmdOption(args) {
+    async execute(args) {
         if (args.length === 0) {
             // List all options
             console.log('Current options:');
             for (const [name, option] of Object.entries(this.options)) {
-                console.log(`  ${name.padEnd(20)} = ${option.value} (${option.description})`);
+                const displayValue = option.value === undefined ? 'off' : option.value;
+                console.log(`  ${name.padEnd(20)} = ${displayValue} (${option.description})`);
             }
             return;
         }
@@ -93,7 +74,8 @@ class OptionCommands {
         
         if (args.length === 1) {
             // Show current value
-            console.log(`${optionName} = ${option.value}`);
+            const displayValue = option.value === undefined ? 'off' : option.value;
+            console.log(`${optionName} = ${displayValue}`);
             console.log(`Description: ${option.description}`);
             return;
         }
@@ -112,17 +94,27 @@ class OptionCommands {
                 return;
             }
         } else if (option.type === 'number') {
-            const numValue = parseInt(newValue);
-            if (isNaN(numValue)) {
-                console.error(`Invalid number value: ${newValue}`);
-                return;
+            if (newValue === 'off' || newValue === 'false' || newValue === 'none') {
+                option.value = undefined;
+            } else {
+                const numValue = parseInt(newValue);
+                if (isNaN(numValue)) {
+                    console.error(`Invalid number value: ${newValue}`);
+                    return;
+                }
+                // Validate prompt color range
+                if (optionName === 'promptColor' && (numValue < 0 || numValue > 15)) {
+                    console.error(`Invalid color value: ${numValue}. Must be 0-15 or 'off'`);
+                    return;
+                }
+                option.value = numValue;
             }
-            option.value = numValue;
         } else {
             option.value = newValue;
         }
         
-        console.log(`${optionName} set to ${option.value}`);
+        const displayValue = option.value === undefined ? 'off' : option.value;
+        console.log(`${optionName} set to ${displayValue}`);
         
         // Update any dependent systems
         this.updateDependentSystems(optionName);
@@ -136,6 +128,14 @@ class OptionCommands {
                 this.repl.pager.enabled = this.options.paginate.value;
                 this.repl.pager.debug = this.options.pagerDebug.value;
             }
+        }
+        
+        // Update prompt immediately if prompt color changed
+        if (optionName === 'promptColor' && this.repl.rl) {
+            const currentPrompt = this.repl.rl.getPrompt();
+            // Force prompt refresh by setting it again
+            this.repl.rl.setPrompt(this.repl.formatPrompt(this.repl.cwd));
+            this.repl.rl.prompt(true);
         }
     }
     
@@ -152,6 +152,42 @@ class OptionCommands {
             debug: this.options.pagerDebug.value
         };
     }
+    
+    // Get prompt color option
+    getPromptColor() {
+        return this.options.promptColor.value;
+    }
+    
+    getHelp() {
+        return {
+            description: 'View or set configuration options',
+            usage: 'option [name] [value]',
+            examples: [
+                'option                    # List all options',
+                'option paginate           # Show current value',
+                'option paginate true      # Enable pagination',
+                'option paginate false     # Disable pagination',
+                'option pagerDebug true    # Enable pager debug info',
+                'option promptColor 2      # Set prompt to green (color 2)',
+                'option promptColor 14     # Set prompt to bright cyan',
+                'option promptColor off    # Disable prompt coloring',
+            ],
+            category: 'Configuration',
+            aliases: ['opt']
+        };
+    }
+    
+    getAliases() {
+        return ['opt'];
+    }
+    
+    getCategory() {
+        return 'BASIC';
+    }
+    
+    showInBasicHelp() {
+        return true;
+    }
 }
 
-module.exports = OptionCommands;
+module.exports = OptionCommand;

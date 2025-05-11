@@ -23,7 +23,7 @@ example:
 # Assemble a specific file
 %.bin: %.asm
 	@echo "Assembling $<..."
-	@node -e "const BurstREPL = require('./burst-repl.js'); const repl = new BurstREPL(); repl.cmdAssemble(['$<']);"
+	@node -e "const BurstREPL = require('./burst-repl.js'); const repl = new BurstREPL(); repl.assemble(['$<']);"
 
 # Run assembled program
 run-%.bin: %.bin

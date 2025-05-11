@@ -13,7 +13,7 @@ async function debugTest(filename) {
     try {
         // Create REPL and assemble
         const repl = new BurstREPL();
-        await repl.assemblyCommands.cmdAssemble([filename]);
+        await repl.assemble([filename]);
         
         // Create VM
         const vm = new BurstVM();

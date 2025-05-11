@@ -3,11 +3,7 @@
 
 const readline = require('readline');
 const { BurstVM, BurstAssembler, OPCODES } = require('./burst-vm.js');
-const CommandHandlers = require('./repl/command-handlers');
 const { disassembleInstruction } = require('./repl/disassembler');
-const ShellCommands = require('./repl/shell-commands');
-const AssemblyCommands = require('./repl/assembly-commands');
-const OptionCommands = require('./repl/option-commands');
 const { Debugger } = require('./repl/debugger');
 const PlatformUtils = require('./repl/platform-utils');
 const { Pager } = require('./repl/pager');
@@ -15,6 +11,9 @@ const helpSystem = require('./repl/help-system');
 const { createCompleter } = require('./repl/completer');
 const path = require('path');
 const os = require('os');
+
+// Single command system import
+const ReplCommands = require('./repl/repl-commands');
 
 // BURST REPL class
 class BurstREPL {
@@ -34,11 +33,15 @@ class BurstREPL {
         // Save the original working directory
         this.originalCwd = process.cwd();
         
-        // Initialize options early to set up pager
-        this.optionCommands = new OptionCommands(this);
+        // Initialize unified command system
+        this.replCommands = new ReplCommands(this);
+        this.commands = this.replCommands.getCommands();
         
-        // Initialize pager with options
-        this.pager = new Pager(this.optionCommands.getPagerOptions());
+        // Now the shellCommands reference will be available
+        this.commandLoader = this.replCommands.commandLoader;
+        
+        // Initialize pager with options from the command system
+        this.pager = new Pager(this.replCommands.getPagerOptions());
         
         // Set pager in help system
         helpSystem.setPager(this.pager);
@@ -56,29 +59,30 @@ class BurstREPL {
             terminal: true
         });
         
-        // Initialize command handlers
-        this.commandHandlers = new CommandHandlers(this);
-        this.shellCommands = new ShellCommands(this);
-        this.assemblyCommands = new AssemblyCommands(this);
-        
-        // Combine commands from all handlers
-        this.commands = {
-            ...this.commandHandlers.getCommands(),
-            ...this.shellCommands.getCommands(),
-            ...this.assemblyCommands.getCommands(),
-            ...this.optionCommands.getCommands()
-        };
-        
-        // Make shell commands available to other handlers
-        this.cwd = this.shellCommands.cwd;
-        this.getAbsolutePath = this.shellCommands.getAbsolutePath.bind(this.shellCommands);
+        // Make shell commands current working directory available
+        this.cwd = this.commandLoader.cwd;
+        this.getAbsolutePath = this.commandLoader.getAbsolutePath.bind(this.commandLoader);
         
         // Get list of valid mnemonics (lowercase)
         this.validMnemonics = Object.keys(OPCODES).map(op => op.toLowerCase());
+
+         // Create a direct assemble method for compatibility with tests
+        this.assemble = (args) => {
+            if (this.commands['assemble']) {
+                return this.commands['assemble'](args);
+            } else {
+                throw new Error('Assemble command not loaded');
+            }
+        };
     }
-    
-    // Format the prompt based on current directory
+
+    // Format the prompt based on current directory - with safety checks and color support
     formatPrompt(currentPath) {
+        // Safety check for undefined path
+        if (!currentPath) {
+            currentPath = this.originalCwd || process.cwd();
+        }
+        
         const termWidth = PlatformUtils.getTerminalWidth();
         const maxPathLength = Math.floor(termWidth / 2);
         
@@ -168,7 +172,7 @@ class BurstREPL {
         }
         
         // Handle path abbreviation if it's too long
-        const fullPrompt = 'burst' + formattedPath + '>';
+        let fullPrompt = 'burst' + formattedPath + '>';
         if (fullPrompt.length > maxPathLength && formattedPath.length > 0) {
             // Start removing components from the beginning until it fits
             let parts = formattedPath.trim().split('/');
@@ -205,10 +209,27 @@ class BurstREPL {
             } else {
                 formattedPath = ' /:' + shortenedPath + '>';
             }
-            return 'burst' + formattedPath.slice(0, -1) + '>';
+            fullPrompt = 'burst' + formattedPath.slice(0, -1) + '>';
         }
         
-        return fullPrompt;
+        // Apply color if specified
+        const promptColor = this.replCommands.getOption ? this.replCommands.getOption('promptColor') : undefined;
+        if (promptColor !== undefined && promptColor !== null) {
+            // ANSI color codes: 30-37 for regular colors, 90-97 for bright colors
+            let colorCode;
+            if (promptColor >= 0 && promptColor <= 7) {
+                colorCode = 30 + promptColor;
+            } else if (promptColor >= 8 && promptColor <= 15) {
+                colorCode = 90 + (promptColor - 8);
+            }
+            
+            if (colorCode) {
+                // Apply color to the prompt and reset at the end
+                fullPrompt = `\x1b[${colorCode}m${fullPrompt}\x1b[0m`;
+            }
+        }
+        
+        return fullPrompt || 'burst>';
     }
     
     // Start the REPL
@@ -240,7 +261,7 @@ class BurstREPL {
         this.rl.prompt();
     }
     
-    // Handle command input
+    // Handle command input - fixed version
     async handleCommand(line) {
         if (!line) {
             this.rl.prompt();
@@ -258,6 +279,9 @@ class BurstREPL {
             if (shellCmd) {
                 await this.commands['!']([shellCmd]);
             }
+            // Update prompt and return
+            this.cwd = this.commandLoader.cwd;
+            this.rl.setPrompt(this.formatPrompt(this.cwd));
             this.rl.prompt();
             return;
         }
@@ -274,6 +298,7 @@ class BurstREPL {
         // Execute command if it exists in the command table AND it's not a mnemonic
         if (this.commands[cmd] && !isValidMnemonic) {
             try {
+                // Commands should not return values that get printed
                 await this.commands[cmd](args);
             } catch (error) {
                 console.error(`Error: ${error.message}`);
@@ -282,7 +307,14 @@ class BurstREPL {
             // It's either a valid mnemonic or not a known command
             // In either case, try to parse as assembly instruction
             try {
-                await this.assemblyCommands.parseAssemblyLine(line);
+                const handled = await this.replCommands.handleSpecialInput(line);
+                if (!handled) {
+                    // If handleSpecialInput didn't handle it and it's not a valid command
+                    if (!this.commands[cmd]) {
+                        console.error(`Unknown command: ${cmd}`);
+                        console.error(`Type 'help' for a list of commands`);
+                    }
+                }
             } catch (error) {
                 // Intercept and improve specific error messages
                 if (error.message.includes('Unknown mnemonic')) {
@@ -309,9 +341,8 @@ class BurstREPL {
         }
         
         // Always update prompt based on current directory
-        this.cwd = this.shellCommands.cwd;
+        this.cwd = this.commandLoader.cwd;
         this.rl.setPrompt(this.formatPrompt(this.cwd));
-        
         this.rl.prompt();
     }
     

@@ -104,9 +104,25 @@ class HelpSystem {
         return help;
     }
     
+    getCategories() {
+        const categories = {};
+        
+        // Group commands by category
+        for (const [name, cmd] of Object.entries(commands)) {
+            const category = cmd.category || 'General';
+            if (!categories[category]) {
+                categories[category] = {};
+            }
+            categories[category][name] = cmd;
+        }
+        
+        return categories;
+    }
+    
     // Show help
     async showHelp(args) {
         if (args.length === 0) {
+            console.log('');
             const help = this.getGeneralHelp();
             if (this.pager && this.repl && this.pager.shouldPaginate(help)) {
                 await this.pager.paginate(help, this.repl.rl);
@@ -117,6 +133,7 @@ class HelpSystem {
             const cmd = args[0].toLowerCase();
             const help = this.getCommandHelp(cmd);
             if (help) {
+                console.log('');
                 if (this.pager && this.repl && this.pager.shouldPaginate(help)) {
                     await this.pager.paginate(help, this.repl.rl);
                 } else {
