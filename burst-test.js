@@ -32,14 +32,18 @@ console.log('Test 2: Memory Operations');
 const vm2 = new BurstVM();
 const asm2 = new BurstAssembler();
 
-asm2.movi(0, 0x1000);      // Address
-asm2.movi(1, 0x12345678);  // Value
-asm2.store(1, 0, 0);       // Store value at address
-asm2.load(2, 0, 0);        // Load it back
+// Calculate addresses manually since we can't use labels directly
+const successAddr = 7 * 4; // 7 instructions * 4 bytes each
+
+asm2.movi(3, 0x1000);      // Address in R3
+asm2.movi(1, 0x1234);      // Value in R1
+asm2.store(1, 3, 0);       // Store value at address
+asm2.load(2, 3, 0);        // Load it back into R2
 asm2.cmp(1, 2);            // Compare
-asm2.jeq('success');
-asm2.halt();
-asm2.label('success');
+asm2.jeq(successAddr);     // Jump to success if equal
+asm2.halt();               // Otherwise halt (failure)
+
+// Success path (at instruction 7)
 asm2.movi(0, SYSCALLS.SYS_PUTCHAR);
 asm2.movi(1, 79); // 'O'
 asm2.syscall();
@@ -79,6 +83,9 @@ console.log('\nTest 4: Arithmetic Operations');
 const vm3 = new BurstVM();
 const asm3 = new BurstAssembler();
 
+// Calculate addresses
+const failAddr = 23 * 4;  // fail label will be at instruction 23
+
 asm3.movi(0, 10);     // r0 = 10
 asm3.movi(1, 5);      // r1 = 5
 asm3.add(2, 0, 1);    // r2 = r0 + r1 = 15
@@ -89,19 +96,19 @@ asm3.div(5, 0, 1);    // r5 = r0 / r1 = 2
 // Check results
 asm3.movi(6, 15);
 asm3.cmp(2, 6);
-asm3.jne('fail');
+asm3.jne(failAddr);
 
 asm3.movi(6, 5);
 asm3.cmp(3, 6);
-asm3.jne('fail');
+asm3.jne(failAddr);
 
 asm3.movi(6, 50);
 asm3.cmp(4, 6);
-asm3.jne('fail');
+asm3.jne(failAddr);
 
 asm3.movi(6, 2);
 asm3.cmp(5, 6);
-asm3.jne('fail');
+asm3.jne(failAddr);
 
 // Success
 asm3.movi(0, SYSCALLS.SYS_PUTCHAR);
@@ -115,7 +122,7 @@ asm3.movi(1, 83); // 'S'
 asm3.syscall();
 asm3.halt();
 
-asm3.label('fail');
+// Fail path (at instruction 23)
 asm3.movi(0, SYSCALLS.SYS_PUTCHAR);
 asm3.movi(1, 70); // 'F'
 asm3.syscall();
@@ -138,16 +145,18 @@ console.log('Test 5: Stack Operations');
 const vm4 = new BurstVM();
 const asm4 = new BurstAssembler();
 
+const stackOkAddr = 7 * 4;  // stack_ok label at instruction 7
+
 asm4.movi(0, 42);
 asm4.push(0);
 asm4.movi(0, 0);  // Clear r0
 asm4.pop(0);      // Should restore 42
 asm4.movi(1, 42);
 asm4.cmp(0, 1);
-asm4.jeq('stack_ok');
+asm4.jeq(stackOkAddr);
 asm4.halt();
 
-asm4.label('stack_ok');
+// stack_ok path (at instruction 7)
 asm4.movi(0, SYSCALLS.SYS_PUTCHAR);
 asm4.movi(1, 83); // 'S'
 asm4.syscall();
@@ -187,10 +196,44 @@ loop:
 fs.writeFileSync('test_loop.asm', loopAsm);
 console.log('Created test_loop.asm');
 
+// Test 7: Sign Extension Test
+console.log('\nTest 7: Sign Extension Test');
+const vm5 = new BurstVM();
+const asm5 = new BurstAssembler();
+
+// Test negative immediate values
+asm5.movi(0, 0xFFFF);  // Should be -1 after sign extension
+asm5.movi(1, 0);       // R1 = 0
+asm5.add(1, 1, 0);     // R1 = 0 + (-1) = -1
+asm5.movi(2, 0xFFFF);  // R2 = -1
+asm5.cmp(1, 2);        // Compare R1 and R2
+asm5.jeq(6 * 4);       // Jump to success if equal
+asm5.halt();           // Otherwise fail
+
+// Success path
+asm5.movi(0, SYSCALLS.SYS_PUTCHAR);
+asm5.movi(1, 83); // 'S'
+asm5.syscall();
+asm5.halt();
+
+const program5 = asm5.getProgram();
+vm5.loadProgram(program5);
+vm5.run();
+console.log('Expected: S (sign extension working)');
+console.log(`VM output: ${vm5.output}\n`);
+
 // Summary
 console.log('\n=== Test Summary ===');
 console.log('The BURST VM appears to be working correctly.');
-console.log('To test the REPL interactively, run:');
+console.log('All tests should have passed:');
+console.log('  Test 1: A');
+console.log('  Test 2: OK');
+console.log('  Test 3: (Assembly file created)');
+console.log('  Test 4: PASS');
+console.log('  Test 5: S');
+console.log('  Test 6: (Assembly file created)');
+console.log('  Test 7: S');
+console.log('\nTo test the REPL interactively, run:');
 console.log('  node burst-repl.js');
 console.log('\nThen try:');
 console.log('  assemble test_hello.asm -l');

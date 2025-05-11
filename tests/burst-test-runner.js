@@ -58,7 +58,7 @@ async function runTest(testFile) {
         console.log = () => {};
         
         // Assemble the test file
-        await repl.commandHandlers.cmdAssemble([testFile.file]);
+        await repl.assemblyCommands.cmdAssemble([testFile.file]);
         
         // Restore console.log
         console.log = originalConsoleLog;

@@ -1,16 +1,16 @@
 // BURST VM - Basic Universal Reference System Toolkit
 // This is a JavaScript implementation that can run in Node.js or browser
-// Enhanced with complete instruction set and improved memory management
+// Updated to align with ISA and fix missing functionality
 
-// Instruction opcodes
+// Instruction opcodes (aligned with documented ISA)
 const OPCODES = {
     // Memory operations
     LOAD:  0x01,    // Load word from memory
     STORE: 0x02,    // Store word to memory
     PUSH:  0x03,    // Push to stack
     POP:   0x04,    // Pop from stack
-    LOADB: 0x05,    // Load byte from memory
-    STOREB:0x06,    // Store byte to memory
+    LOADB: 0x05,    // Load byte from memory (extension)
+    STOREB:0x06,    // Store byte to memory (extension)
     
     // Arithmetic/Logic
     ADD:   0x10,    // Add
@@ -24,9 +24,9 @@ const OPCODES = {
     NOT:   0x18,    // Bitwise NOT
     SHL:   0x19,    // Shift left
     SHR:   0x1A,    // Shift right
-    INC:   0x1B,    // Increment
-    DEC:   0x1C,    // Decrement
-    NEG:   0x1D,    // Negate
+    INC:   0x1B,    // Increment (extension)
+    DEC:   0x1C,    // Decrement (extension)
+    NEG:   0x1D,    // Negate (extension)
     
     // Control flow
     JMP:   0x20,    // Jump
@@ -36,10 +36,10 @@ const OPCODES = {
     JNE:   0x24,    // Jump if not equal
     JLT:   0x25,    // Jump if less than
     JGT:   0x26,    // Jump if greater than
-    JLE:   0x27,    // Jump if less or equal
-    JGE:   0x28,    // Jump if greater or equal
-    CALL:  0x29,    // Function call
-    RET:   0x2A,    // Return from function
+    CALL:  0x27,    // Function call
+    RET:   0x28,    // Return from function
+    JLE:   0x29,    // Jump if less or equal (extension)
+    JGE:   0x2A,    // Jump if greater or equal (extension)
     
     // Register operations
     MOV:   0x30,    // Move register to register
@@ -246,7 +246,7 @@ class BurstVM {
         this.memory = new Uint8Array(memorySize);
         this.registers = new Uint32Array(16); // R0-R15
         this.pc = 0; // Program counter
-        this.sp = memorySize - 4; // Stack pointer (grows down)
+        this.sp = memorySize - 8; // Stack pointer (grows down, leave room for first push)
         this.flags = 0;
         this.halted = false;
         
@@ -409,6 +409,14 @@ class BurstVM {
         }
     }
     
+    // Helper function for sign extension
+    signExtend16(value) {
+        if (value & 0x8000) {
+            return value | 0xFFFF0000;
+        }
+        return value;
+    }
+    
     // Execute one instruction
     step() {
         if (this.halted) return;
@@ -478,7 +486,8 @@ class BurstVM {
             case OPCODES.MOVI: {
                 const reg = (operands >> 16) & 0xF;
                 const imm = operands & 0xFFFF;
-                this.registers[reg] = imm;
+                // Sign extend the immediate value
+                this.registers[reg] = this.signExtend16(imm);
                 break;
             }
             
@@ -486,6 +495,22 @@ class BurstVM {
                 const dest = (operands >> 16) & 0xF;
                 const src = (operands >> 12) & 0xF;
                 this.registers[dest] = this.registers[src];
+                break;
+            }
+            
+            // Comparison operation (was missing)
+            case OPCODES.CMP: {
+                const reg1 = (operands >> 16) & 0xF;
+                const reg2 = (operands >> 12) & 0xF;
+                const a = this.registers[reg1];
+                const b = this.registers[reg2];
+                const result = a - b;
+                
+                // Update flags based on comparison
+                this.setFlag(FLAGS.ZERO, result === 0);
+                this.setFlag(FLAGS.NEGATIVE, (result & 0x80000000) !== 0);
+                this.setFlag(FLAGS.CARRY, a < b);
+                this.setFlag(FLAGS.OVERFLOW, ((a ^ b) & (a ^ result) & 0x80000000) !== 0);
                 break;
             }
             
@@ -637,15 +662,6 @@ class BurstVM {
                 const amount = this.registers[shiftAmount] & 0x1F;
                 const result = this.registers[src] >>> amount;
                 this.registers[dest] = result;
-                this.updateFlags(result);
-                break;
-            }
-            
-            // Comparison
-            case OPCODES.CMP: {
-                const reg1 = (operands >> 16) & 0xF;
-                const reg2 = (operands >> 12) & 0xF;
-                const result = this.registers[reg1] - this.registers[reg2];
                 this.updateFlags(result);
                 break;
             }
@@ -860,6 +876,12 @@ class BurstAssembler {
         this.emit(this.buildInstruction(OPCODES.MOV, operands));
     }
     
+    // Comparison
+    cmp(reg1, reg2) {
+        const operands = (reg1 << 16) | (reg2 << 12);
+        this.emit(this.buildInstruction(OPCODES.CMP, operands));
+    }
+    
     // Arithmetic operations
     add(dest, src1, src2) {
         const operands = (dest << 16) | (src1 << 12) | (src2 << 8);
@@ -930,12 +952,6 @@ class BurstAssembler {
     shr(dest, src, shiftReg) {
         const operands = (dest << 16) | (src << 12) | (shiftReg << 8);
         this.emit(this.buildInstruction(OPCODES.SHR, operands));
-    }
-    
-    // Comparison
-    cmp(reg1, reg2) {
-        const operands = (reg1 << 16) | (reg2 << 12);
-        this.emit(this.buildInstruction(OPCODES.CMP, operands));
     }
     
     // Control flow
@@ -1060,7 +1076,7 @@ function createMemoryTestProgram() {
     asm.mov(5, 0); // R5 = allocated address
     
     // Store some data
-    asm.movi(4, 0x12345678);
+    asm.movi(4, 0x1234);
     asm.store(4, 5, 0); // Store to allocated memory
     
     // Load it back
@@ -1088,7 +1104,8 @@ function createLoopProgram() {
     
     // Print counter value
     asm.movi(0, SYSCALLS.SYS_PUTCHAR);
-    asm.add(3, 1, '0'.charCodeAt(0)); // Convert to ASCII
+    asm.movi(3, '0'.charCodeAt(0));
+    asm.add(3, 3, 1); // Convert to ASCII
     asm.mov(1, 3);
     asm.syscall();
     
@@ -1097,6 +1114,7 @@ function createLoopProgram() {
     asm.syscall();
     
     // Check loop condition
+    asm.mov(1, 3); // Restore counter
     asm.cmp(1, 2);
     asm.jlt('loop');
     

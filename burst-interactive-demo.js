@@ -8,6 +8,11 @@ const fs = require('fs');
 
 console.log('=== BURST VM Interactive Demo ===\n');
 
+// Create examples directory if it doesn't exist
+if (!fs.existsSync('examples')) {
+    fs.mkdirSync('examples');
+}
+
 // Create a demo program
 const demoProgram = `
 ; BURST VM Interactive Demo
@@ -90,27 +95,49 @@ console.log('8. help\n');
 const repl = new BurstREPL();
 
 // Auto-run some commands to show functionality
-setTimeout(() => {
-    console.log('\nAuto-running demo commands...\n');
-    repl.handleCommand('assemble examples/demo.asm -l');
-    
-    setTimeout(() => {
-        repl.handleCommand('info regs');
+console.log('Auto-running demo commands...\n');
+
+setTimeout(async () => {
+    try {
+        // Use await to handle async operations properly
+        await repl.handleCommand('assemble examples/demo.asm -l');
         
-        setTimeout(() => {
-            repl.handleCommand('run');
+        setTimeout(async () => {
+            await repl.handleCommand('info regs');
             
-            setTimeout(() => {
-                console.log('\nNow try your own commands!');
-                console.log('Type "help" for a list of available commands.');
-                repl.rl.prompt();
+            setTimeout(async () => {
+                await repl.handleCommand('run');
+                
+                setTimeout(() => {
+                    console.log('\nNow try your own commands!');
+                    console.log('Type "help" for a list of available commands.');
+                    console.log('Type "quit" or press Ctrl+C to quit.\n');
+                    
+                    // Now start the REPL properly
+                    repl.start();
+                }, 1000);
             }, 1000);
         }, 1000);
-    }, 1000);
-}, 1000);
+    } catch (error) {
+        console.error('Error during demo:', error);
+        repl.start();
+    }
+}, 500);
 
 // Clean up on exit
 process.on('exit', () => {
+    console.log('Cleaning up.');
     if (fs.existsSync('examples/demo.asm')) fs.unlinkSync('examples/demo.asm');
     if (fs.existsSync('examples/demo.bin')) fs.unlinkSync('examples/demo.bin');
+    
+    // Remove the examples directory if it's empty
+    if (fs.existsSync('examples') && fs.readdirSync('examples').length === 0) {
+        fs.rmdirSync('examples');
+    }
+});
+
+// Handle Ctrl+C gracefully
+process.on('SIGINT', () => {
+    console.log('\nExiting BURST demo...');
+    process.exit(0);
 });
