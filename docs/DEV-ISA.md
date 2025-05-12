@@ -5,20 +5,16 @@ Looking at the file tree and considering the goal of improving the ISA without b
 1. **`burst-vm.js`** - The main VM implementation that contains the ISA definitions and execution logic
 2. **`repl/assembler-utils.js`** - Utilities for assembly operations
 3. **`repl/disassembler.js`** - Handles disassembly of instructions back to mnemonics
-
-## Command Implementation Files (Important):
-
 4. **`repl/commands/basic/assemble.js`** - The actual assemble command implementation
-5. **`repl/commands/debugger/disasm.js`** - Disassembly command
 
 ## Test Files (If they exist):
 
-6. **`tests/assembler-syntax-test.js`** - Test suite that needs to be kept up to date.
+5. **`tests/assembler-syntax-test.js`** - Test suite that needs to be kept up to date.
 
 ## Expression Evaluators (Potentially Important):
 
-7. **`repl/expression-evaluator.js`** - If it handles assembly expressions
-8. **`repl/vm-expression-evaluator.js`** - VM-specific expression evaluation
+6. **`repl/expression-evaluator.js`** - If it handles assembly expressions
+7. **`repl/vm-expression-evaluator.js`** - VM-specific expression evaluation
 
 Any other test files related to:
 - Assembly parsing
@@ -28,11 +24,12 @@ Any other test files related to:
 
 ## Supporting Files (Context-dependent):
 
-9. **`repl/commands/debugger/info.js`** - Info command that might display registers/memory
-10. **`repl/commands/debugger/step.js`** - Single-step execution
-11. **`repl/debugger.js`** - Debugger implementation that might need to know about new instructions
-12. **`repl/assembly-commands.js`** - If it contains ISA-specific command logic
-13. **`repl/repl-commands.js`** - If it has special handling for assembly input
+8. **`repl/commands/debugger/info.js`** - Info command that might display registers/memory
+9. **`repl/commands/debugger/step.js`** - Single-step execution
+10. **`repl/debugger.js`** - Debugger implementation that might need to know about new instructions
+11. **`repl/assembly-commands.js`** - If it contains ISA-specific command logic
+12. **`repl/repl-commands.js`** - If it has special handling for assembly input
+13. **`repl/commands/debugger/disasm.js`** - Disassembly command
 14. **`repl/commands/basic/run.js`** - Execution command that might have ISA dependencies
 15. **`repl/mnemonic-utils.js`** - Contains mnemonic validation and suggestion logic
 16. **`repl/assembly-parser.js`** - Handles parsing of assembly instructions, but it reads opcode list from assembler-utils.js.

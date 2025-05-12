@@ -9,18 +9,13 @@ const path = require('path');
 // Try to load BurstREPL from different possible locations
 let BurstREPL;
 try {
-    // First try current directory
-    BurstREPL = require('./burst-repl.js');
+    // Then try parent directory
+    BurstREPL = require('../lib/burst-repl.js');
 } catch (e1) {
-    try {
-        // Then try parent directory
-        BurstREPL = require('../burst-repl.js');
-    } catch (e2) {
-        console.error('Could not find burst-repl.js in current or parent directory');
-        console.error('Current directory:', process.cwd());
-        console.error('Script directory:', __dirname);
-        process.exit(1);
-    }
+    console.error('Could not find burst-repl.js');
+    console.error('Current directory:', process.cwd());
+    console.error('Script directory:', __dirname);
+    process.exit(1);
 }
 
 console.log('BurstREPL loaded successfully');

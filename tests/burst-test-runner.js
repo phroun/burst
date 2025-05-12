@@ -5,8 +5,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { BurstVM, BurstAssembler } = require('../burst-vm.js');
-const BurstREPL = require('../burst-repl.js');
+const { BurstVM, BurstAssembler } = require('../lib/burst-vm.js');
+const BurstREPL = require('../lib/burst-repl.js');
 
 // Test files
 const testFiles = [

@@ -17,6 +17,16 @@ BURST uses a 32-bit instruction format with 8-bit opcodes and 24-bit operands. T
 - **SP**: Stack Pointer (initialized to top of memory)
 - **FLAGS**: Status flags register
 
+### Register Aliases (ISA Addendum)
+
+| Alias | Reg | Description             |
+|-------|-----|-------------------------|
+| R0    | R0  | Return value            |
+| A1–A5 | R1–R5 | Argument registers    |
+| T1–T5 | R6–R10 | Temporary/caller-saved |
+| S1–S4 | R11–R14 | Callee-saved       |
+| FP    | R15 | Frame pointer           |
+
 ## Flags Register
 
 | Bit | Flag     | Description                    |
@@ -90,6 +100,37 @@ BURST uses a 32-bit instruction format with 8-bit opcodes and 24-bit operands. T
 | 0x41   | HALT     |           | Halt execution                   |
 | 0x42   | NOP      |           | No operation                     |
 
+### ISA Addendum Extensions
+
+#### Extended Instructions
+
+| Opcode | Mnemonic | Format           | Description                    |
+|--------|----------|------------------|--------------------------------|
+| 0x43   | LIMM     | reg, imm32       | Load full 32-bit constant      |
+| 0x46   | ENTER    | imm16            | Push FP, set FP = SP, alloc locals|
+| 0x47   | LEAVE    |                  | SP = FP, pop old FP            |
+| 0x48   | CALLI    | reg              | Call function at reg address   |
+| 0x49   | JMPR     | reg              | Jump to address in register    |
+| 0x4A   | ROL      | dest, src, shiftReg | Rotate left                 |
+| 0x4B   | ROR      | dest, src, shiftReg | Rotate right                |
+| 0x4C   | SAR      | dest, src, shiftReg | Arithmetic (signed) right shift|
+| 0x4D   | ADDI     | dest, src, imm8  | dest = src + immediate         |
+| 0x4E   | CMPI     | reg, imm8        | Compare reg with immediate     |
+| 0x4F   | TRAP     | imm8             | Trigger trap/debug hook        |
+
+#### Conditional Move Instructions
+
+| Opcode | Mnemonic | Format     | Description                   | Equivalent Jump |
+|--------|----------|------------|-------------------------------|-----------------|
+| 0x60   | MOVC     | dest, src  | Unconditional move            | JMP             |
+| 0x61   | MOVZ     | dest, src  | Move if Z == 1 (Zero)         | JZ              |
+| 0x62   | MOVNZ    | dest, src  | Move if Z == 0 (Non-Zero)     | JNZ             |
+| 0x63   | MOVLT    | dest, src  | N ≠ V (signed less than)      | JLT             |
+| 0x64   | MOVGE    | dest, src  | N == V (signed greater or eq) | JGE             |
+| 0x65   | MOVLE    | dest, src  | Z == 1 or N ≠ V               | JLE             |
+| 0x66   | MOVGT    | dest, src  | Z == 0 and N == V             | JGT             |
+| 0x67   | MOVNE    | dest, src  | Z == 0 (alias of MOVNZ)       | JNE             |
+
 ## System Call Convention
 
 System calls are invoked using the SYSCALL instruction with:
@@ -133,6 +174,19 @@ System calls are invoked using the SYSCALL instruction with:
 ```
 - Immediate values are sign-extended to 32 bits
 
+### Register-Immediate8 (ADDI, CMPI)
+```
+[OPCODE:8][REG:4][SRC:4][IMM8:8][PAD:4]
+```
+- Immediate values are sign-extended to 32 bits
+
+### Load 32-bit Immediate (LIMM)
+```
+Word 1: [0x43][REG:8][RESERVED:16]
+Word 2: [IMM32: 32-bit immediate value]
+```
+- Two-word instruction for loading 32-bit constants
+
 ### Memory Operations (LOAD/STORE)
 ```
 [OPCODE:8][REG:4][ADDR_REG:4][OFFSET:12]
@@ -142,6 +196,11 @@ System calls are invoked using the SYSCALL instruction with:
 ### Jump/Branch Operations
 ```
 [OPCODE:8][ADDRESS:24]
+```
+
+### Stack Frame Operations (ENTER)
+```
+[OPCODE:8][RESERVED:8][LOCALS_SIZE:16]
 ```
 
 ## Instruction Encoding Examples
@@ -165,6 +224,21 @@ LOAD R3, R5, 0x10:   [0x01][0x3][0x5][0x010]
                       │     │    └─────── Address Register (R5)
                       │     └──────────── Destination (R3)
                       └────────────────── LOAD opcode
+
+LIMM R4, 0x12345678: [0x43][0x4][0x00][0x0000]
+                      │     │    │     └── Reserved
+                      │     │    └──────── Reserved
+                      │     └───────────── Register 4
+                      └─────────────────── LIMM opcode
+                     [0x12345678]
+                      └─────────────────── 32-bit immediate value
+
+ADDI R1, R2, -5:     [0x4D][0x1][0x2][0xFB][0x0]
+                      │     │    │    │    └── Padding
+                      │     │    │    └─────── Immediate (-5)
+                      │     │    └──────────── Source (R2)
+                      │     └────────────────── Destination (R1)
+                      └──────────────────────── ADDI opcode
 ```
 
 ## Calling Convention
@@ -176,18 +250,29 @@ LOAD R3, R5, 0x10:   [0x01][0x3][0x5][0x010]
 - Caller saves R6-R10
 - Callee saves R11-R15
 
-### Stack Frame
+### Stack Frame (Enhanced with ENTER/LEAVE)
 ```
 +------------------+
 | Return address   | <- SP after CALL
 +------------------+
-| Saved registers  |
+| Saved FP (R15)   | <- SP after ENTER
 +------------------+
-| Local variables  |
+| Local variables  | <- FP (R15) points here
++------------------+
+| Saved registers  |
 +------------------+
 | Arguments 6+     | <- SP before CALL
 +------------------+
 ```
+
+#### ENTER Instruction
+1. Pushes current FP (R15) onto stack
+2. Sets FP = SP (new frame)
+3. Allocates space for locals by decreasing SP
+
+#### LEAVE Instruction
+1. Restores SP = FP (deallocates locals)
+2. Pops old FP from stack
 
 ## Notes
 
@@ -197,8 +282,19 @@ LOAD R3, R5, 0x10:   [0x01][0x3][0x5][0x010]
 - JLE/JGE: Additional conditional jumps
 - Flexible memory addressing with register + offset
 
+### ISA Addendum Extensions
+- LIMM: Load 32-bit immediate values
+- ENTER/LEAVE: Stack frame management
+- CALLI/JMPR: Indirect control flow
+- ROL/ROR/SAR: Extended shift operations
+- ADDI/CMPI: Immediate arithmetic/compare
+- TRAP: Software interrupts/debugging
+- MOVC.*: Conditional move family
+
 ### Design Decisions
 - Register + offset addressing makes array/structure access easier
 - Immediate values are sign-extended for signed arithmetic
 - System call convention uses registers for efficiency
 - Extra instructions added for common operations to reduce code size
+- Enhanced stack frame support for higher-level languages
+- Conditional moves enable branch-free programming
