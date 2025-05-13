@@ -75,13 +75,12 @@ Currently reserved for future extensions:
 
 | Opcode | Mnemonic | Format    | Description                      |
 |--------|----------|-----------|----------------------------------|
-| 0x00   | NOP      |           | No operation                     |
-| 0x01   | HALT     |           | Halt execution                   |
-| 0x02   | SYSCALL  |           | System call (number in R0)       |
-| 0x03   | TRAP     | imm8      | Software trap/debug hook         |
-| 0x04   | INT      | imm8      | Software interrupt               |
-| 0x05   | IRET     |           | Return from interrupt            |
-| 0x06   | Reserved |           |                                  |
+| 0x00   | HALT     |           | Halt execution                   |
+| 0x01   | SYSCALL  |           | System call (number in R0)       |
+| 0x02   | TRAP     | imm8      | Software trap/debug hook         |
+| 0x03   | INT      | imm8      | Software interrupt               |
+| 0x04   | IRET     |           | Return from interrupt            |
+| 0x05   | Reserved |           |                                  |
 | ...    | ...      | ...       | ...                              |
 | 0x0F   | Reserved |           |                                  |
 
