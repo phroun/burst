@@ -1,10 +1,10 @@
-// Continue command plugin - Updated for interface architecture
+// Continue command plugin
 
 const BaseCommand = require('../BaseCommand');
 
 class ContinueCommand extends BaseCommand {
     async execute(args) {
-        if (this.vmInterface.isHalted()) {
+        if (this.vm.halted) {
             console.log('Program already halted');
             return;
         }

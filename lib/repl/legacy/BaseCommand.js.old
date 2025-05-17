@@ -1,4 +1,4 @@
-// Base class for command plugins - Updated for interface architecture and new directory structure
+// Base class for command plugins
 
 class BaseCommand {
     constructor(commandLoader) {
@@ -57,32 +57,27 @@ class BaseCommand {
     
     // Helper: Access PlatformUtils
     get PlatformUtils() {
-        return require('../../utils/platform-utils');
+        return require('../platform-utils');
     }
     
     // Helper: Access glob utilities
     get glob() {
-        return require('../../utils/glob-matcher');
+        return require('../glob-matcher');
     }
     
-    // Helper: Access VM interface
-    get vmInterface() {
-        return this.repl.vmInterface;
-    }
-    
-    // Helper: Access assembler interface
-    get assemblerInterface() {
-        return this.repl.assemblerInterface;
-    }
-    
-    // Helper: Access disassembler interface
-    get disassemblerInterface() {
-        return this.repl.disassemblerInterface;
+    // Helper: Access VM
+    get vm() {
+        return this.repl.vm;
     }
     
     // Helper: Access debugger
     get debugger() {
         return this.repl.debugger;
+    }
+    
+    // Helper: Access disassembler
+    get disassembler() {
+        return this.repl.disassembler;
     }
 }
 

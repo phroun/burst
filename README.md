@@ -9,7 +9,7 @@ BURST is a minimal bytecode runtime and virtual machine designed to be a univers
 3. **Educational focus** - Designed for people learning about computers and system programming
 4. **Language ecosystem** - Support for LLVM and native language development
 5. **Interactive environment** - Built-in terminal and REPL for exploration
-6. **Host OS integration** - Bridge to native filesystem and system resources
+6. **Host OS integration** - Bridge to native filesystem an	d system resources
 7. **Self-contained** - Built-in filesystem and core utilities
 
 ## Project Structure

@@ -1,7 +1,7 @@
-// Break command plugin - Updated for interface architecture
+// Break command plugin
 
 const BaseCommand = require('../BaseCommand');
-const { parseAddress } = require('../../utils/vm-expression-evaluator');
+const { parseAddress } = require('../../vm-expression-evaluator');
 
 class BreakCommand extends BaseCommand {
     async execute(args) {

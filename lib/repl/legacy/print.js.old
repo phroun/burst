@@ -1,8 +1,8 @@
-// Print command plugin - Updated for interface architecture
+// Print command plugin
 
 const BaseCommand = require('../BaseCommand');
-const { evaluateExpression, createVMLookupFunction } = require('../../utils/vm-expression-evaluator');
-const { ExprEvaluator } = require('../../utils/expression-evaluator');
+const { evaluateExpression } = require('../../vm-expression-evaluator');
+const { ExprEvaluator } = require('../../expression-evaluator');
 
 class PrintCommand extends BaseCommand {
     async execute(args) {
@@ -12,20 +12,9 @@ class PrintCommand extends BaseCommand {
         }
         
         const expr = args.join(' ');
-        
+        const exprEval = new ExprEvaluator((n) => { if (n == 'x') return 100; return n; });
         try {
-            // Create a variable lookup function that uses vmInterface
-            const lookupFn = createVMLookupFunction(this.vmInterface, this.debugger.symbols);
-            
-            // Create expression evaluator with our lookup function
-            const exprEval = new ExprEvaluator(lookupFn);
-            
-            // Evaluate the expression
-            const valueExpression = exprEval.evaluate(expr);
-            
-            // Pass to evaluateExpression for memory access and final resolution
-            const value = evaluateExpression(this.vmInterface, valueExpression, this.debugger.symbols);
-            
+            const value = evaluateExpression(this.vm, exprEval.evaluate(expr), this.debugger.symbols);
             console.log(`${expr} = 0x${value.toString(16)} (${value})`);
         } catch (error) {
             console.error(`Error evaluating expression: ${error.message}`);

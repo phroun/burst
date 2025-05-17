@@ -1,7 +1,7 @@
-// Watch command plugin - Updated for interface architecture
+// Watch command plugin
 
 const BaseCommand = require('../BaseCommand');
-const { parseAddress } = require('../../utils/vm-expression-evaluator');
+const { parseAddress } = require('../../vm-expression-evaluator');
 
 class WatchCommand extends BaseCommand {
     async execute(args) {

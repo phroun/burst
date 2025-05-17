@@ -139,7 +139,11 @@ class CommandLoader {
             } else {
                 // Create a command that executes the alias
                 this.commands[alias] = async (args) => {
-                    const fullCommand = command.split(' ').concat(args);
+                    let fullCommand = command.split(' ').concat(args);
+                    if (command.startsWith('!')) {
+                      fullCommand.unshift('exec');
+                      fullCommand[1] = fullCommand[1].slice(1);
+                    }
                     const baseCommand = fullCommand[0];
                     const commandArgs = fullCommand.slice(1);
                     

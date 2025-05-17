@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "BURST Virtual Machine REPL and Command Interpreter",
   "main": "lib/burst-repl.js",
+  "type": "commonjs",
   "directories": {
     "lib": "repl"
   },

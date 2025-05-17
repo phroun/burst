@@ -113,6 +113,37 @@ Total: 160KB initial allocation
 [4:0]   Addressing Mode (4 bits) - Operand addressing
 ```
 
+### Condition Encoding
+
+For efficiency and beauty, our conditional operations have the condition encoded within their 8 bit Operation number in a specific pattern:
+
+| Instruction        | Description                         | Binary | Extended | C = 0 | S = V | Z = 0 | SVZ Inverted | Unsigned | Signed |
+|--------------------|-------------------------------------|--------|----------|-------|-------|-------|----------|----------|--------|
+| JMP                | Jump always                         | 00000  |          |       |       |       |          | Yes(OR)  | Yes    |
+| NOP                | Jump never                          | 00001  |          |       |       |       | ✓        | Yes(OR)  | Yes    |
+| JNZ / JNE          | Jump if Not Zero / Not Equal        | 00010  |          |       |       | ✓     |          | Yes(OR)  | Yes    |
+| JZ / JE            | Jump if Zero / Jump if Equal        | 00011  |          |       |       | ✓     | ✓        | Yes(OR)  | Yes    |
+| JGE / JNL          | Jump if Greater or Equal / Not Less | 00100  |          |       | ✓     |       |          | No(AND)  | Yes    |
+| JL / JNGE          | Jump if Less / Not Greater or Equal | 00101  |          |       | ✓     |       | ✓        | No(AND)  | Yes    |
+| JG / JNLE          | Jump if Greater or Equal / Not Less | 00110  |          |       | ✓     | ✓     |          | No(AND)  | Yes    |
+| JLE / JNG          | Jump if Less or Equal / Not Greater | 00111  |          |       | ✓     | ✓     | ✓        | No(AND)  | Yes    |
+| JAE / JNB / JNC    | Jump if Above or Equal / Not Below  | 01000  |          | ✓     |       |       |          | Yes(OR)  | No     |
+| JB / JNAE / JC     | Jump if Below / Not Above or Equal  | 01001  |          | ✓     |       |       | ✓        | Yes(OR)  | No     |
+| JA / JNBE          | Jump if Above or Not Below or Equal | 01010  |          | ✓     |       | ✓     |          | Yes(OR)  | No     |
+| JBE / JNA          | Jump if Below or Equal / Not Above  | 01011  |          | ✓     |       | ✓     | ✓        | Yes(OR)  | No     |
+| ?                  | ?                                   | 01100  |          | ✓     | ✓     |       |          | ?        | ?      |
+| ?                  | ?                                   | 01101  |          | ✓     | ✓     |       | ✓        | ?        | ?      |
+| ?                  | ?                                   | 01110  |          | ✓     | ✓     | ✓     |          | ?        | ?      |
+| ?                  | ?                                   | 01111  |          | ✓     | ✓     | ✓     | ✓        | ?        | ?      |
+
+
+| ?                  |                                     | 10110  | ✓        |       |       |       |          |          |        |
+| ?                  |                                     | 10111  | ✓        |       |       |       | ✓        |          |        |
+| ?                  |                                     | 11000  | ✓        |       | ✓     |       |          |          |        |
+| ?                  |                                     | 11001  | ✓        |       | ✓     |       | ✓        |          |        |
+| ?                  |                                     | 11010  | ✓        |       | ✓     | ✓     |          |          |        |
+| ?                  |                                     | 11011  | ✓        |       | ✓     | ✓     | ✓        |          |        |
+
 ### Category Assignments
 | Category | Hex | Description |
 |----------|-----|-------------|
@@ -220,77 +251,88 @@ Creates a stack frame with specified local variable space and nesting level.
 | 08 | 0x0100 | RETF | RETF | Far return |
 
 #### Category 1: Branching
-| Op | Opcode | Mnemonic | Mode | Condition | Description |
+
+This category includes a condition mask in bits [9:5] of the opcode.
+
+| Bit | Name | Regular Meaning | Extended Meaning |
+|-----|------|-----------------|------------------|
+| 5 | Invert | Invert entire Condition | Invert entire Condition |
+| 6 | ZBlock | Only execute if Z==0 | Only execute if DE==0 | 
+| 7 | SBlock | Only execute if S≠O | Reserved |
+| 8 | Reserved | Undefined | Undefined |
+| 9 | Extended | Use Extended Meanings | Use Extended Meanings |
+
+| Op | Opcode | Condition Mask | Mnemonic | Mode | Condition | Description |
 |----|--------|----------|------|-----------|-------------|
-| 00 | 0x1001 | JMP | I8 | Always | Jump relative 8-bit |
-| 00 | 0x1002 | JMP | I16 | Always | Jump relative 16-bit |
-| 00 | 0x1008 | JMP | [R] | Always | Jump register indirect |
-| 00 | 0x100A | JMP | M | Always | Jump absolute |
-| 00 | 0x100F | JMP | seg:offs | Always | Far Jump absolute |
-| 01 | 0x1020 | NOP | NOP | No operation |
-| 01 | 0x1021 | NOP | I8 | Never | No operation |
-| 01 | 0x1022 | NOP | I16 | Never | No operation |
-| 01 | 0x1023 | NOP | NOP i32 | Never | No operation |
-| 01 | 0x1024 | NOP | NOP R | Never | No operation |
-| 01 | 0x1025 | NOP | NOP R,R | Never | No operation |
-| 01 | 0x1026 | NOP | NOP R,I8 | Never | No operation |
-| 01 | 0x1027 | NOP | NOP R,I32 | Never | No operation |
-| 01 | 0x1028 | NOP | [R] | Never | No jump (indirect) |
-| 01 | 0x1029 | NOP | NOP [R],R | Never | No operation |
-| 01 | 0x102A | NOP | M | Never | No jump (absolute) |
-| 01 | 0x102B | NOP | NOP M,R | Never | No operation |
-| 01 | 0x102C | NOP | NOP R,[R+I] | Never | No operation |
-| 01 | 0x102D | NOP | NOP [R+I],R | Never | No operation |
-| 01 | 0x102E | NOP | NOP (Undefined) | Never | (Reserved) |
-| 01 | 0x102F | NOP | seg:offs | Never | No operation |
-| 02 | 0x1041 | JNZ/JNE | I8 | Z==0 | Jump if not zero (8-bit) |
-| 02 | 0x1042 | JNZ/JNE | I16 | Z==0 | Jump if not zero (16-bit) |
-| 02 | 0x1048 | JNZ/JNE | [R] | Z==0 | Jump if not zero (indirect) |
-| 02 | 0x104A | JNZ/JNE | M | Z==0 | Jump if not zero (absolute) |
-| 03 | 0x1061 | JZ/JE | I8 | Z==1 | Jump if zero (8-bit) |
-| 03 | 0x1062 | JZ/JE | I16 | Z==1 | Jump if zero (16-bit) |
-| 03 | 0x1068 | JZ/JE | [R] | Z==1 | Jump if zero (indirect) |
-| 03 | 0x106A | JZ/JE | M | Z==1 | Jump if zero (absolute) |
-| 04 | 0x1081 | JGE/JNL | I8 | S==O | Jump if greater or equal (8-bit) |
-| 04 | 0x1082 | JGE/JNL | I16 | S==O | Jump if greater or equal (16-bit) |
-| 04 | 0x1088 | JGE/JNL | [R] | S==O | Jump if greater or equal (indirect) |
-| 04 | 0x108A | JGE/JNL | M | S==O | Jump if greater or equal (absolute) |
-| 05 | 0x10A1 | JL/JNGE | I8 | S≠O | Jump if less (8-bit) |
-| 05 | 0x10A2 | JL/JNGE | I16 | S≠O | Jump if less (16-bit) |
-| 05 | 0x10A8 | JL/JNGE | [R] | S≠O | Jump if less (indirect) |
-| 05 | 0x10AA | JL/JNGE | M | S≠O | Jump if less (absolute) |
-| 06 | 0x10C1 | JG/JNLE | I8 | Z==0 & S==O | Jump if greater (8-bit) |
-| 06 | 0x10C2 | JG/JNLE | I16 | Z==0 & S==O | Jump if greater (16-bit) |
-| 06 | 0x10C8 | JG/JNLE | [R] | Z==0 & S==O | Jump if greater (indirect) |
-| 06 | 0x10CA | JG/JNLE | M | Z==0 & S==O | Jump if greater (absolute) |
-| 07 | 0x10E1 | JLE/JNG | I8 | Z==1 or S≠O | Jump if less or equal (8-bit) |
-| 07 | 0x10E2 | JLE/JNG | I16 | Z==1 or S≠O | Jump if less or equal (16-bit) |
-| 07 | 0x10E8 | JLE/JNG | [R] | Z==1 or S≠O | Jump if less or equal (indirect) |
-| 07 | 0x10EA | JLE/JNG | M | Z==1 or S≠O | Jump if less or equal (absolute) |
-| 0A | 0x1141 | JB/JC | I8 | C==1 | Jump if below/carry (8-bit) |
-| 0A | 0x1142 | JB/JC | I16 | C==1 | Jump if below/carry (16-bit) |
-| 0A | 0x1148 | JB/JC | [R] | C==1 | Jump if below/carry (indirect) |
-| 0A | 0x114A | JB/JC | M | C==1 | Jump if below/carry (absolute) |
-| 0B | 0x1161 | JAE/JNC | I8 | C==0 | Jump if above or equal (8-bit) |
-| 0B | 0x1162 | JAE/JNC | I16 | C==0 | Jump if above or equal (16-bit) |
-| 0B | 0x1168 | JAE/JNC | [R] | C==0 | Jump if above or equal (indirect) |
-| 0B | 0x116A | JAE/JNC | M | C==0 | Jump if above or equal (absolute) |
-| 0C | 0x1181 | JA/JNBE | I8 | C==0 & Z==0 | Jump if above (8-bit) |
-| 0C | 0x1182 | JA/JNBE | I16 | C==0 & Z==0 | Jump if above (16-bit) |
-| 0C | 0x1188 | JA/JNBE | [R] | C==0 & Z==0 | Jump if above (indirect) |
-| 0C | 0x118A | JA/JNBE | M | C==0 & Z==0 | Jump if above (absolute) |
-| 0D | 0x11A1 | JBE/JNA | I8 | C==1 or Z==1 | Jump if below or equal (8-bit) |
-| 0D | 0x11A2 | JBE/JNA | I16 | C==1 or Z==1 | Jump if below or equal (16-bit) |
-| 0D | 0x11A8 | JBE/JNA | [R] | C==1 or Z==1 | Jump if below or equal (indirect) |
-| 0D | 0x11AA | JBE/JNA | M | C==1 or Z==1 | Jump if below or equal (absolute) |
-| 10 | 0x1201 | JDE | I8 | DE==1 | Jump if divide error (8-bit) |
-| 10 | 0x1202 | JDE | I16 | DE==1 | Jump if divide error (16-bit) |
-| 10 | 0x1208 | JDE | [R] | DE==1 | Jump if divide error (indirect) |
-| 10 | 0x120A | JDE | M | DE==1 | Jump if divide error (absolute) |
-| 11 | 0x1211 | JNDE | I8 | DE==0 | Jump if no divide error (8-bit) |
-| 11 | 0x1212 | JNDE | I16 | DE==0 | Jump if no divide error (16-bit) |
-| 11 | 0x1218 | JNDE | [R] | DE==0 | Jump if no divide error (indirect) |
-| 11 | 0x121A | JNDE | M | DE==0 | Jump if no divide error (absolute) |
+| 00 | 0x1001 | ....=00 |  JMP | I8 | Always | Jump relative 8-bit |
+| 00 | 0x1002 | ....=00 |  JMP | I16 | Always | Jump relative 16-bit |
+| 00 | 0x1008 | ....=00 | JMP | [R] | Always | Jump register indirect |
+| 00 | 0x100A | ....=00 | JMP | M | Always | Jump absolute |
+| 00 | 0x100F | ....=00 | JMP | seg:offs | Always | Far Jump absolute |
+| 01 | 0x1020 | ...I=01 | NOP | NOP | Never | No operation |
+| 01 | 0x1021 | ...I=01 | NOP | I8 | Never | No operation |
+| 01 | 0x1022 | ...I=01 | NOP | I16 | Never | No operation |
+| 01 | 0x1023 | ...I=01 | NOP | NOP i32 | Never | No operation |
+| 01 | 0x1024 | ...I=01 | NOP | NOP R | Never | No operation |
+| 01 | 0x1025 | ...I=01 | NOP | NOP R,R | Never | No operation |
+| 01 | 0x1026 | ...I=01 | NOP | NOP R,I8 | Never | No operation |
+| 01 | 0x1027 | ...I=01 | NOP | NOP R,I32 | Never | No operation |
+| 01 | 0x1028 | ...I=01 | NOP | [R] | Never | No operation |
+| 01 | 0x1029 | ...I=01 | NOP | NOP [R],R | Never | No operation |
+| 01 | 0x102A | ...I=01 | NOP | M | Never | No operaion |
+| 01 | 0x102B | ...I=01 | NOP | NOP M,R | Never | No operation |
+| 01 | 0x102C | ...I=01 | NOP | NOP R,[R+I] | Never | No operation |
+| 01 | 0x102D | ...I=01 | NOP | NOP [R+I],R | Never | No operation |
+| 01 | 0x102E | ...I=01 | NOP | NOP (Undefined) | Never | (Reserved) |
+| 01 | 0x102F | ...I=01 | NOP | seg:offs | Never | No operation |
+| 02 | 0x1041 | ..Z.=02 | JNZ/JNE | I8 | Z==0 | Jump if not zero (8-bit) |
+| 02 | 0x1042 | ..Z.=02 | JNZ/JNE | I16 | Z==0 | Jump if not zero (16-bit) |
+| 02 | 0x1048 | ..Z.=02 | JNZ/JNE | [R] | Z==0 | Jump if not zero (indirect) |
+| 02 | 0x104A | ..Z.=02 | JNZ/JNE | M | Z==0 | Jump if not zero (absolute) |
+| 03 | 0x1061 | ..ZI=03 | JZ/JE | I8 | Z==1 | Jump if zero (8-bit) |
+| 03 | 0x1062 | ..ZI=03 | JZ/JE | I16 | Z==1 | Jump if zero (16-bit) |
+| 03 | 0x1068 | ..ZI=03 | JZ/JE | [R] | Z==1 | Jump if zero (indirect) |
+| 03 | 0x106A | ..ZI=03 | JZ/JE | M | Z==1 | Jump if zero (absolute) |
+| 04 | 0x1081 | .S..=04 | JGE/JNL | I8 | S==O | Jump if greater or equal (8-bit) |
+| 04 | 0x1082 | .S..=04 | JGE/JNL | I16 | S==O | Jump if greater or equal (16-bit) |
+| 04 | 0x1088 | .S..=04 | JGE/JNL | [R] | S==O | Jump if greater or equal (indirect) |
+| 04 | 0x108A | .S..=04 | JGE/JNL | M | S==O | Jump if greater or equal (absolute) |
+| 05 | 0x10A1 | .S.I=05 | JL/JNGE | I8 | S≠O | Jump if less (8-bit) |
+| 05 | 0x10A2 | .S.I=05 | JL/JNGE | I16 | S≠O | Jump if less (16-bit) |
+| 05 | 0x10A8 | .S.I=05 | JL/JNGE | [R] | S≠O | Jump if less (indirect) |
+| 05 | 0x10AA | .S.I=05 | JL/JNGE | M | S≠O | Jump if less (absolute) |
+| 06 | 0x10C1 | .SZ.=06 | JG/JNLE | I8 | Z==0 & S==O | Jump if greater (8-bit) |
+| 06 | 0x10C2 | .SZ.=06 | JG/JNLE | I16 | Z==0 & S==O | Jump if greater (16-bit) |
+| 06 | 0x10C8 | .SZ.=06 | JG/JNLE | [R] | Z==0 & S==O | Jump if greater (indirect) |
+| 06 | 0x10CA | .SZ.=06 | JG/JNLE | M | Z==0 & S==O | Jump if greater (absolute) |
+| 07 | 0x10E1 | .SZI=07 | JLE/JNG | I8 | Z==1 or S≠O | Jump if less or equal (8-bit) |
+| 07 | 0x10E2 | .SZI=07 | JLE/JNG | I16 | Z==1 or S≠O | Jump if less or equal (16-bit) |
+| 07 | 0x10E8 | .SZI=07 | JLE/JNG | [R] | Z==1 or S≠O | Jump if less or equal (indirect) |
+| 07 | 0x10EA | .SZI=07 | JLE/JNG | M | Z==1 or S≠O | Jump if less or equal (absolute) |
+| 0A | 0x1141 | X...=08 | JB/JC | I8 | C==1 | Jump if below/carry (8-bit) |
+| 0A | 0x1142 | X...=08 | JB/JC | I16 | C==1 | Jump if below/carry (16-bit) |
+| 0A | 0x1148 | X...=08 | [R] | C==1 | Jump if below/carry (indirect) |
+| 0A | 0x114A | X...=08 | M | C==1 | Jump if below/carry (absolute) |
+| 0B | 0x1161 | X..I=09 | I8 | C==0 | Jump if above or equal (8-bit) |
+| 0B | 0x1162 | X..I=09 | I16 | C==0 | Jump if above or equal (16-bit) |
+| 0B | 0x1168 | X..I=09 | [R] | C==0 | Jump if above or equal (indirect) |
+| 0B | 0x116A | X..I=09 | M | C==0 | Jump if above or equal (absolute) |
+| 0C | 0x1181 | X.Z.=0A | I8 | C==0 & Z==0 | Jump if above (8-bit) |
+| 0C | 0x1182 | X.Z.=0A | JA/JNBE | I16 | C==0 & Z==0 | Jump if above (16-bit) |
+| 0C | 0x1188 | X.Z.=0A | JA/JNBE | [R] | C==0 & Z==0 | Jump if above (indirect) |
+| 0C | 0x118A | X.Z.=0A | JA/JNBE | M | C==0 & Z==0 | Jump if above (absolute) |
+| 0D | 0x11A1 | X.ZI=0B | JBE/JNA | I8 | C==1 or Z==1 | Jump if below or equal (8-bit) |
+| 0D | 0x11A2 | X.ZI=0B | JBE/JNA | I16 | C==1 or Z==1 | Jump if below or equal (16-bit) |
+| 0D | 0x11A8 | X.ZI=0B | JBE/JNA | [R] | C==1 or Z==1 | Jump if below or equal (indirect) |
+| 0D | 0x11AA | X.ZI=0B | JBE/JNA | M | C==1 or Z==1 | Jump if below or equal (absolute) |
+| 10 | 0x1201 | XS..=0C | JNDE | I8 | DE==1 | Jump if no divide error (8-bit) |
+| 10 | 0x1202 | XS..=0C | JNDE | I16 | DE==1 | Jump if no divide error (16-bit) |
+| 10 | 0x1208 | XS..=0C | JNDE | [R] | DE==1 | Jump if no divide error (indirect) |
+| 10 | 0x120A | XS..=0C | JNDE | M | DE==1 | Jump if no divide error (absolute) |
+| 11 | 0x1211 | XS.I=0D | JDE | I8 | DE==0 | Jump if divide error (8-bit) |
+| 11 | 0x1212 | XS.I=0D | JDE | I16 | DE==0 | Jump if divide error (16-bit) |
+| 11 | 0x1218 | XS.I=0D | JDE | [R] | DE==0 | Jump if divide error (indirect) |
+| 11 | 0x121A | XS.I=0D | JDE | M | DE==0 | Jump if divide error (absolute) |
 
 #### Category 2: Data Movement
 | Op | Opcode | Mnemonic | Modes | Description |

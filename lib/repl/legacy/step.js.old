@@ -1,4 +1,4 @@
-// Step command plugin - Updated for interface architecture
+// Step command plugin
 
 const BaseCommand = require('../BaseCommand');
 
@@ -7,24 +7,17 @@ class StepCommand extends BaseCommand {
         const count = args.length > 0 ? parseInt(args[0]) : 1;
         
         for (let i = 0; i < count; i++) {
-            if (this.vmInterface.isHalted()) {
+            if (this.vm.halted) {
                 console.log('Program halted');
                 break;
             }
             
-            const pc = this.vmInterface.getPC();
-            
-            // Disassemble the current instruction
-            const disassembled = this.disassemblerInterface.disassembleInstruction(this.vmInterface, pc);
-            if (disassembled) {
-                const formatted = this.disassemblerInterface.formatInstruction(disassembled);
-                console.log(formatted);
-            } else {
-                console.log(`0x${pc.toString(16).padStart(8, '0')}: ???`);
-            }
+            const pc = this.vm.pc;
+            const instruction = this.vm.readWord(pc);
+            const disasm = this.disassembler.disassembleInstruction(this.vm, pc, instruction);
+            console.log(`0x${pc.toString(16).padStart(8, '0')}: ${disasm}`);
 
-            // Step the VM
-            this.vmInterface.step();
+            this.vm.step();
         }
     }
     
